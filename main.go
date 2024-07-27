@@ -33,6 +33,7 @@ const (
 	TokenH5
 	TokenH6
 	TokenSpace
+	TokenCodeLine
 	TokenPlainText
 	TokenAsterisk
 	TokenBacktick
@@ -40,6 +41,7 @@ const (
 	TokenUnderscoreR
 	TokenTildeL
 	TokenTildeR
+	TokenQuote
 )
 
 func main() {
@@ -63,7 +65,9 @@ func Lex(d []byte) {
 		case '\r':
 			t, err = l.newL()
 		case ' ':
-			continue
+			if t = l.space(); t == nil {
+				continue
+			}
 		case '#':
 			t = l.header()
 		case '*':
@@ -82,8 +86,8 @@ func Lex(d []byte) {
 					t.Type = TokenTildeR
 				}
 			}
-		// case '>':
-		// 	t = l.gt()
+		case '>':
+			t = l.gt()
 		default:
 			t = l.plainText()
 		}
@@ -120,6 +124,44 @@ func (l *Lexer) newL() (*Token, error) {
 	return &t, errors.New("new line identation error")
 }
 
+func (l *Lexer) space() *Token {
+	if !l.beginning() {
+		return nil
+	}
+	i := l.Pos
+	for ; i < len(l.Data); i++ {
+		switch l.Data[i] {
+		case ' ':
+			continue
+		default:
+			if i-l.Pos >= 4 && l.Data[i] != '\r' {
+				l.Pos = i
+				return l.codeLine()
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+func (l *Lexer) beginning() bool {
+	return l.Pos == 0 || l.Data[l.Pos-1] == '\n'
+}
+
+func (l *Lexer) codeLine() *Token {
+	i := l.Pos
+	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+	}
+	t := Token{
+		Type: TokenCodeLine,
+		Start: l.Pos,
+		End: i,
+		Row: l.Row,
+	}
+	l.Pos = i-1
+	return &t
+}
+
 func (l *Lexer) header() *Token {
 	t := Token{Type: TokenErr, Row: l.Row}
 	i := l.Pos
@@ -137,43 +179,22 @@ func (l *Lexer) header() *Token {
 			return l.plainText()
 		}
 	}
-
 CheckContent:
-	for j := i; j < len(l.Data); j++ {
+	for j := i; j < len(l.data); j++ {
 		switch {
-		case chopChar(l.Data[j]):
+		case chopchar(l.data[j]):
 			continue
-		case l.Data[j] == '\r':
+		case l.data[j] == '\r':
 			return &t
 		default:
-			goto Ok
+			goto ok
 		}
 	}
-
 Ok:
 	t.Start = l.Pos
 	t.End = i
 	t.Type = TokenH1
 	l.Pos = i
-	return &t
-}
-
-func (l *Lexer) plainText() *Token {
-	i := l.Pos
-	for ; i < len(l.Data); i++ {
-		switch l.Data[i] {
-		case '\r', '*', '`', '_', '~':
-			goto End
-		}
-	}
-End:
-	t := Token{
-		Type:  TokenPlainText,
-		Start: l.Pos,
-		End:   i,
-		Row:   l.Row,
-	}
-	l.Pos = i - 1
 	return &t
 }
 
@@ -231,6 +252,41 @@ Left:
 	return &t
 Right:
 	t.Type = TokenUnderscoreR
+	return &t
+}
+
+func (l *Lexer) gt() *Token {
+	i := l.Pos-1
+	for ; i >= 0 && l.Data[i] != '\n' && l.Data[i] != '>'; i-- {
+	}
+	if i < 0 || l.Pos-i < 5 {
+		return &Token{
+			Type: TokenQuote,
+			Start: l.Pos,
+			End: l.Pos+1,
+			Row: l.Row,
+		}
+	}
+	return l.codeLine()
+}
+
+
+func (l *Lexer) plainText() *Token {
+	i := l.Pos
+	for ; i < len(l.Data); i++ {
+		switch l.Data[i] {
+		case '\r', '*', '`', '_', '~':
+			goto End
+		}
+	}
+End:
+	t := Token{
+		Type:  TokenPlainText,
+		Start: l.Pos,
+		End:   i,
+		Row:   l.Row,
+	}
+	l.Pos = i - 1
 	return &t
 }
 
