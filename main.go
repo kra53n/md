@@ -76,7 +76,8 @@ func Lex(d []byte) []Token {
 			t = l.single(TokenTilde)
 		case '!':
 			t = l.exclamationMark()
-		// case '[':
+		case '[':
+			t = l.openBrac()
 		default:
 			t = l.plainText()
 		}
@@ -203,7 +204,40 @@ func (l *Lexer) exclamationMark() Token {
 		}
 	}
 	return l.single(TokenPlainText)
+}
 
+func (l *Lexer) openBrac() Token {
+	openBracs := 1
+	i := l.Pos + 1
+	for ; i < len(l.Data) && openBracs != 0 && l.Data[i] != '\r'; i++ {
+		switch l.Data[i] {
+		case '[':
+			openBracs++
+		case ']':
+			openBracs--
+		}
+	}
+	if openBracs != 0 || l.Data[i] != '(' {
+		return l.single(TokenPlainText)
+	}
+	i++
+	openBracs = 0
+	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+		switch l.Data[i] {
+		case '(':
+			return l.single(TokenPlainText)
+		case ')':
+			t := Token{
+				Type:  TokenLink,
+				Start: l.Pos,
+				End:   i + 1,
+				Row:   l.Row,
+			}
+			l.Pos = i
+			return t
+		}
+	}
+	return l.single(TokenPlainText)
 }
 
 /* NOTE(kra53n): wait for parsing
