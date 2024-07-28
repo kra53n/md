@@ -92,9 +92,24 @@ func Lex(d []byte) []Token {
 			continue
 		}
 
-		t.print(&l)
+		var prv1, prv2 TokenType
+		if len(tokens) > 1 {
+			prv1 = tokens[len(tokens)-1].Type
+		}
+		if len(tokens) > 2 {
+			prv2 = tokens[len(tokens)-2].Type
+		}
+		if prv1 == prv2 && prv1 == t.Type && t.Type == TokenNewL {
+			continue
+		} else if prv1 == TokenSpace && t.Type == TokenNewL {
+			tokens = tokens[:len(tokens)-1]
+		}
+		tokens = append(tokens, t)
 	}
-
+	i := len(tokens) - 1
+	for ; i > 0 && tokens[i].Type == TokenNewL; i-- {
+	}
+	tokens = tokens[:i+1]
 	return tokens
 }
 
