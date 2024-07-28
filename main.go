@@ -40,6 +40,8 @@ const (
 	TokenPlainText
 	TokenLink
 	TokenImg
+	TokenUnorderedList
+	TokenOrderedList
 )
 
 func main() {
@@ -78,6 +80,10 @@ func Lex(d []byte) []Token {
 			t = l.exclamationMark()
 		case '[':
 			t = l.openBrac()
+		case '-':
+			t = l.dash()
+		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			t = l.digit()
 		default:
 			t = l.plainText()
 		}
@@ -238,6 +244,64 @@ func (l *Lexer) openBrac() Token {
 		}
 	}
 	return l.single(TokenPlainText)
+}
+
+func (l *Lexer) dash() Token {
+	t := Token{
+		Type:  TokenUnorderedList,
+		Start: l.Pos,
+		End:   l.Pos + 1,
+		Row:   l.Row,
+	}
+	if l.Pos == 0 {
+		return t
+	}
+	i := l.Pos - 1
+	for ; i > 0 && l.Data[i] == ' '; i-- {
+	}
+	if l.Data[i] == '-' {
+		return t
+	}
+	t.Type = TokenPlainText
+	return t
+}
+
+func (l *Lexer) digit() Token {
+	t := Token{
+		Type:  TokenOrderedList,
+		Start: l.Pos,
+		End:   l.Pos + 1,
+		Row:   l.Row,
+	}
+	i := l.Pos
+	for ; i > 0 && l.Data[i] == ' '; i-- {
+	}
+	if !(i == l.Pos && i == 0 || l.Data[i] != '\r') {
+		t.Type = TokenPlainText
+		return t
+	}
+	i = l.Pos
+	for ; i < len(l.Data); i++ {
+		c := l.Data[i]
+		if '0' <= c && c <= '9' {
+			continue
+		}
+		switch c {
+		case ' ', '\r', 0:
+			t.Type = TokenPlainText
+			t.Start = l.Pos
+			t.End = i
+			l.Pos = i - 1
+			return t
+		case '.', ')':
+			t.Start = l.Pos
+			t.End = i + 1
+			l.Pos = i
+			return t
+		}
+	}
+	t.Type = TokenPlainText
+	return t
 }
 
 /* NOTE(kra53n): wait for parsing
