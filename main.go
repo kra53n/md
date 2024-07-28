@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,24 +23,23 @@ type Token struct {
 type TokenType int
 
 const (
-	TokenErr TokenType = iota
-	TokenNewL
+	TokenNil TokenType = iota
 	TokenH1
 	TokenH2
 	TokenH3
 	TokenH4
 	TokenH5
 	TokenH6
+	TokenNewL
 	TokenSpace
-	TokenCodeLine
-	TokenPlainText
 	TokenAsterisk
 	TokenBacktick
-	TokenUnderscoreL
-	TokenUnderscoreR
-	TokenTildeL
-	TokenTildeR
 	TokenQuote
+	TokenUnderscore
+	TokenTilde
+	TokenPlainText
+	TokenLink
+	TokenImg
 )
 
 func main() {
@@ -54,63 +52,45 @@ func main() {
 	Lex(data)
 }
 
-func Lex(d []byte) {
+func Lex(d []byte) []Token {
 	l := Lexer{}
 	l.Data = d
 
-	var t *Token
-	var err error
+	var t Token
+	var tokens []Token
 	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
 		switch l.Data[l.Pos] {
 		case '\r':
-			t, err = l.newL()
+			t = l.newL()
 		case ' ':
-			if t = l.space(); t == nil {
-				continue
-			}
-		case '#':
-			t = l.header()
+			t = l.space()
 		case '*':
-			t = l.asterisk()
+			t = l.single(TokenAsterisk)
 		case '`':
-			t = l.asterisk()
-			t.Type = TokenBacktick
-		case '_':
-			t = l.underscore()
-		case '~':
-			if t = l.underscore(); t != nil {
-				switch t.Type {
-				case TokenUnderscoreL:
-					t.Type = TokenTildeL
-				case TokenUnderscoreR:
-					t.Type = TokenTildeR
-				}
-			}
+			t = l.single(TokenBacktick)
 		case '>':
-			t = l.gt()
+			t = l.single(TokenQuote)
+		case '_':
+			t = l.single(TokenUnderscore)
+		case '~':
+			t = l.single(TokenTilde)
+		// case '!':
+		// case '[':
 		default:
 			t = l.plainText()
 		}
 
-		if t == nil {
+		if t.Type == TokenNil {
 			continue
 		}
 
 		t.print(&l)
-		if t.Type == TokenErr {
-			goto Err
-		}
 	}
 
-	return
-Err:
-	fmt.Println("Error while lexing", *t)
-	if err != nil {
-		fmt.Println(err)
-	}
+	return tokens
 }
 
-func (l *Lexer) newL() (*Token, error) {
+func (l *Lexer) newL() Token {
 	t := Token{}
 	if l.Pos < len(l.Data)-1 && l.Data[l.Pos+1] == '\n' {
 		t.Type = TokenNewL
@@ -119,60 +99,36 @@ func (l *Lexer) newL() (*Token, error) {
 		t.Row = l.Row
 		l.Pos++
 		l.Row++
-		return &t, nil
+		return t
 	}
-	return &t, errors.New("new line identation error")
+	return t
 }
 
-func (l *Lexer) space() *Token {
-	if !l.beginning() {
-		return nil
-	}
+func (l *Lexer) space() Token {
 	i := l.Pos
-	for ; i < len(l.Data); i++ {
-		switch l.Data[i] {
-		case ' ':
-			continue
-		default:
-			if i-l.Pos >= 4 && l.Data[i] != '\r' {
-				l.Pos = i
-				return l.codeLine()
-			}
-			return nil
-		}
-	}
-	return nil
-}
-
-func (l *Lexer) beginning() bool {
-	return l.Pos == 0 || l.Data[l.Pos-1] == '\n'
-}
-
-func (l *Lexer) codeLine() *Token {
-	i := l.Pos
-	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+	for ; i < len(l.Data) && l.Data[i] == ' '; i++ {
 	}
 	t := Token{
-		Type: TokenCodeLine,
+		Type:  TokenSpace,
 		Start: l.Pos,
-		End: i,
-		Row: l.Row,
+		End:   i,
+		Row:   l.Row,
 	}
-	l.Pos = i-1
-	return &t
+	l.Pos = i - 1
+	return t
 }
 
-func (l *Lexer) header() *Token {
-	t := Token{Type: TokenErr, Row: l.Row}
+func (l *Lexer) header() Token {
+	t := Token{Row: l.Row}
 	i := l.Pos
 	for ; i < len(l.Data); i++ {
 		switch {
 		case l.Data[i] == '#' && i-l.Pos == 6:
-			return &t
+			return t
 		case l.Data[i] == '#':
 			continue
 		case l.Data[i] == '\r':
-			return &t
+			return t
 		case l.Data[i] == ' ':
 			goto CheckContent
 		default:
@@ -180,102 +136,57 @@ func (l *Lexer) header() *Token {
 		}
 	}
 CheckContent:
-	for j := i; j < len(l.data); j++ {
+	for j := i; j < len(l.Data); j++ {
 		switch {
-		case chopchar(l.data[j]):
+		case chopChar(l.Data[j]):
 			continue
-		case l.data[j] == '\r':
-			return &t
+		case l.Data[j] == '\r':
+			return t
 		default:
-			goto ok
+			goto Ok
 		}
 	}
 Ok:
 	t.Start = l.Pos
 	t.End = i
-	t.Type = TokenH1
+	t.Type = TokenType(int(TokenH1) + i - l.Pos - 1)
 	l.Pos = i
-	return &t
+	return t
 }
 
-func (l *Lexer) asterisk() *Token {
-	return &Token{
-		Type:  TokenAsterisk,
+func (l *Lexer) single(tp TokenType) Token {
+	return Token{
+		Type:  tp,
 		Start: l.Pos,
 		End:   l.Pos + 1,
 		Row:   l.Row,
 	}
 }
 
-func (l *Lexer) underscore() *Token {
-	t := Token{
-		Type:  TokenErr,
-		Start: l.Pos,
-		End:   l.Pos + 1,
-		Row:   l.Row,
-	}
-	var lChoping, rChoping bool
-	if len(l.Data) == 1 {
-		goto PlainText
-	}
+/* NOTE(kra53n): wait for parsing
+const (
+	noteLowerS = "note"
+	noteUpperS = "NOTE"
 
-	rChoping = chopChar(l.Data[l.Pos+1])
-	if l.Pos == 0 && !rChoping {
-		goto Left
-	}
-	if l.Pos-1 < 0 {
-		goto PlainText
-	}
-	if l.Data[l.Pos-1] == '\n' && !rChoping {
-		goto Left
-	}
+	tipLowerS = "tip"
+	tipUpperS = "TIP"
 
-	lChoping = chopChar(l.Data[l.Pos-1])
-	if l.Pos == len(l.Data)-1 && !lChoping || l.Data[l.Pos+1] == '\r' && !lChoping {
-		goto Right
-	}
-	lChoping = chopChar(l.Data[l.Pos-1])
-	rChoping = chopChar(l.Data[l.Pos+1])
-	if l.Data[l.Pos-1] != '\n' && l.Data[l.Pos+1] != '\r' && lChoping != rChoping {
-		switch {
-		case lChoping:
-			goto Left
-		case rChoping:
-			goto Right
-		}
-	}
-PlainText:
-	t.Type = TokenPlainText
-	return &t
-Left:
-	t.Type = TokenUnderscoreL
-	return &t
-Right:
-	t.Type = TokenUnderscoreR
-	return &t
-}
+	importantLowerS = "important"
+	importantUpperS = "IMPORTANT"
 
-func (l *Lexer) gt() *Token {
-	i := l.Pos-1
-	for ; i >= 0 && l.Data[i] != '\n' && l.Data[i] != '>'; i-- {
-	}
-	if i < 0 || l.Pos-i < 5 {
-		return &Token{
-			Type: TokenQuote,
-			Start: l.Pos,
-			End: l.Pos+1,
-			Row: l.Row,
-		}
-	}
-	return l.codeLine()
-}
+	warningLowerS = "warning"
+	warningUpperS = "WARNING"
 
+	cautionLowerS = "caution"
+	cautionUpperS = "CAUTION"
+)
+*/
 
-func (l *Lexer) plainText() *Token {
+func (l *Lexer) plainText() Token {
 	i := l.Pos
 	for ; i < len(l.Data); i++ {
 		switch l.Data[i] {
-		case '\r', '*', '`', '_', '~':
+		case '\r', ' ', '*', '`', '_', '~':
 			goto End
 		}
 	}
@@ -287,7 +198,7 @@ End:
 		Row:   l.Row,
 	}
 	l.Pos = i - 1
-	return &t
+	return t
 }
 
 func (t *Token) print(l *Lexer) {
