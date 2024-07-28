@@ -74,7 +74,8 @@ func Lex(d []byte) []Token {
 			t = l.single(TokenUnderscore)
 		case '~':
 			t = l.single(TokenTilde)
-		// case '!':
+		case '!':
+			t = l.exclamationMark()
 		// case '[':
 		default:
 			t = l.plainText()
@@ -161,6 +162,48 @@ func (l *Lexer) single(tp TokenType) Token {
 		End:   l.Pos + 1,
 		Row:   l.Row,
 	}
+}
+
+func (l *Lexer) exclamationMark() Token {
+	if l.Pos+1 < len(l.Data) && l.Data[l.Pos+1] != '[' {
+		return l.single(TokenPlainText)
+	}
+	openBracs := 1
+	i := l.Pos + 2
+	for ; i < len(l.Data) && openBracs != 0 && l.Data[i] != '\r'; i++ {
+		switch l.Data[i] {
+		case '[':
+			openBracs++
+		case ']':
+			openBracs--
+		}
+	}
+	if openBracs != 0 || i >= len(l.Data) || l.Data[i] != '(' {
+		return l.single(TokenPlainText)
+	}
+	i++
+	openBracs = 0
+	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+		switch l.Data[i] {
+		case '(':
+			openBracs++
+		case ')':
+			if openBracs != 0 {
+				openBracs--
+				continue
+			}
+			t := Token{
+				Type:  TokenImg,
+				Start: l.Pos,
+				End:   i + 1,
+				Row:   l.Row,
+			}
+			l.Pos = i
+			return t
+		}
+	}
+	return l.single(TokenPlainText)
+
 }
 
 /* NOTE(kra53n): wait for parsing
