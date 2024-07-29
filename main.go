@@ -13,5 +13,5 @@ func main() {
 		fmt.Println(os.Stderr, err)
 		return
 	}
-	Parse(Lex(data))
+	fmt.Println(Lex(data))
 }
