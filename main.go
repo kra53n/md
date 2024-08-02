@@ -14,4 +14,7 @@ func main() {
 		return
 	}
 	Parse(data, Lex(data))
+	// res := Render(data, Parse(data, Lex(data)))
+	// fmt.Println(res)
+	// os.WriteFile("rendered.html", []byte(res), 0666)
 }

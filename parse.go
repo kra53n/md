@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	_ "unsafe"
+)
 
 /* NOTE(kra53n): wait for parsing
 const (
@@ -21,20 +24,29 @@ const (
 )
 */
 
-type Elem struct {
-	Elems []Elem
-	T     Token
+type Node struct {
+	T      Token
+	Prt    *Node
+	Nxt    *Node
+	Prv    *Node
+	FstChd *Node
+	LstChd *Node
 }
 
-type Parser struct {
-	Cur  *Elem
-	Prvs []*Elem
-}
+/* Operations:
+ *    2) addchild
+ *    3) getroot
+ */
 
-func Parse(d []byte, tokens []Token) {
+// type Parser struct {
+// 	Cur  *Node
+// 	Prvs []*Node
+// }
+
+func Parse(d []byte, tokens []Token) []Token {
 	/* TODO(kra53n):
 	 * Maybe this stage we can call analysis.
-	 *
+
 	 * Define `*` acceptance, it can be:
 	 *   1) unordered list
 	 *   2) italic
@@ -50,36 +62,78 @@ func Parse(d []byte, tokens []Token) {
 	 * Code inserts.
 	 */
 
-	root := Elem{}
-	p := Parser{Cur: &root}
+	var root, cur *Node
+	root = new(Node)
+	cur = root
 
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
 		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
-			p.Cur.append(tokens[i])
-			p.Prvs = append(p.Prvs, p.Cur)
-			p.Cur = &p.Cur.Elems[0]
-			j := i + 1
-			if tokens[j].Type == TokenSpace {
-				j++
+			root.addChd(&Node{T: tokens[i]})
+			cur = root.LstChd
+
+		case TokenBacktick:
+			if cur.T.Type == TokenBacktick {
+				cur = cur.Prt
+			} else {
+				cur.addChd(&Node{T: tokens[i]})
+				cur = cur.LstChd
 			}
-			for ; j < len(tokens) && tokens[j].Type != TokenNewL; j++ {
-				p.Cur.append(tokens[i])
+
+		case TokenAsterisk:
+			if cur.T.Type == TokenAsterisk {
+				cur = cur.Prt
+			} else {
+				cur.addChd(&Node{T: tokens[i]})
+				cur = cur.LstChd
 			}
-			if tokens[j].Type == TokenNewL {
-				p.Cur = p.Prvs[len(p.Prvs)-1]
-				p.Prvs = p.Prvs[:len(p.Prvs)-1]
-				continue
+
+		case TokenNewL:
+			tmp := cur
+			for ; tmp != nil; tmp = tmp.Prt {
+				switch tmp.T.Type {
+				case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
+					cur = root
+				}
 			}
+			if tokens[i+1].Type == TokenNewL {
+				cur = root
+			}
+
+		case TokenPlainText:
+			cur.addChd(&Node{T: tokens[i]})
 
 		}
 	}
 
-	for _, v := range root.Elems {
-		fmt.Println("-->", v.T.Type)
+	printRoot(root, 2)
+
+	return tokens
+}
+
+func printRoot(root *Node, spaces int) {
+	if root == nil {
+		return
+	}
+	var s string
+	for i := 0; i < spaces; i++ {
+		s += " "
+	}
+	for i := root.FstChd; i != nil; i = i.Nxt {
+		fmt.Printf("%s%d\n", s, i.T.Type)
+		printRoot(i, spaces+2)
 	}
 }
 
-func (e *Elem) append(t Token) {
-	e.Elems = append(e.Elems, Elem{T: t})
+func (whose *Node) addChd(what *Node) {
+	if whose.FstChd == nil {
+		whose.FstChd = what
+		whose.LstChd = what
+		what.Prt = whose
+	} else {
+		whose.LstChd.Nxt = what
+		what.Prv = whose.LstChd
+		whose.LstChd = what
+		whose.LstChd.Prt = whose
+	}
 }
