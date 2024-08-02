@@ -1,65 +1,65 @@
 package main
 
-import (
-	"fmt"
-	// "unsafe"
-)
+/* NOTE(kra53n): here we can implement render of the AST using 2 methods:
+ * 1) using the stack
+ * 2) using the recursion
+ * We must test both variants and choose the best
+ */
+func Render(d []byte, root *Node) string {
+	var res *string
+	res = new(string)
 
-func Render(d []byte, tokens []Token) string {
-	var res string
-	var deque []Token
-	for i := 0; i < len(tokens); i++ {
-		switch tokens[i].Type {
-		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
-			for ; i < len(tokens) && tokens[i].Type != TokenNewL; i++ {
-				deque = append(deque, tokens[i])
-			}
-			res += load(d, &deque)
-			res += upload(d, &deque)
-		}
-	}
-	return res
+	recursiveTraversal(res, d, root, new([]Token))
+	return *res
 }
 
-func load(d []byte, tokens *[]Token) string {
-	for _, t := range *tokens {
-		fmt.Println(t.Type)
+func recursiveTraversal(res *string, d []byte, n *Node, ptr *[]Token) {
+	if n == nil {
+		return
 	}
-	fmt.Println()
-	var res string
-	for _, t := range *tokens {
-		switch t.Type {
-		case TokenH1:
-			res += "<h1>"
-		case TokenH2:
-			res += "<h2>"
-		case TokenH3:
-			res += "<h3>"
-		case TokenBacktick:
-			res += "<code>"
-		case TokenSpace:
-			res += " "
-		case TokenPlainText:
-			res += string(d[t.Start:t.End])
-		}
+	for i := n.FstChd; i != nil; i = i.Nxt {
+		*ptr = append(*ptr, i.T)
+		*res = *res + getOpenedTag(d, &i.T)
+		recursiveTraversal(res, d, i, ptr)
 	}
-	return res
+	if len(*ptr) > 0 {
+		*res += getClosedTag(&(*ptr)[len(*ptr)-1])
+		*ptr = (*ptr)[:len(*ptr)-1]
+	}
 }
 
-func upload(d []byte, tokens *[]Token) string {
-	var res string
-	for i := len(*tokens) - 1; i >= 0; i-- {
-		switch (*tokens)[i].Type {
-		case TokenH1:
-			res += "</h1>\n"
-		case TokenH2:
-			res += "</h2>\n"
-		case TokenH3:
-			res += "</h3>\n"
-		case TokenBacktick:
-			res += "</code>"
-		}
+func getOpenedTag(d []byte, t *Token) string {
+	switch t.Type {
+	case TokenH1:
+		return "<h1>"
+	case TokenH2:
+		return "<h2>"
+	case TokenH3:
+		return "<h3>"
+	case TokenBacktick:
+		return "<code>"
+	case TokenAsterisk:
+		return "<i>"
+	case TokenSpace:
+		return " "
+	case TokenPlainText:
+		return string(d[t.Start:t.End])
 	}
-	*tokens = (*tokens)[:0]
-	return res
+	return ""
+}
+
+func getClosedTag(t *Token) string {
+	switch t.Type {
+	case TokenH1:
+		return "</h1>\n"
+	case TokenH2:
+		return "</h2>\n"
+	case TokenH3:
+		return "</h3>\n"
+	case TokenAsterisk:
+		return "</i>"
+	case TokenBacktick:
+		return "</code>"
+	}
+	return ""
 }

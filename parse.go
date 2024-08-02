@@ -43,7 +43,7 @@ type Node struct {
 // 	Prvs []*Node
 // }
 
-func Parse(d []byte, tokens []Token) []Token {
+func Parse(d []byte, tokens []Token) *Node {
 	/* TODO(kra53n):
 	 * Maybe this stage we can call analysis.
 
@@ -108,7 +108,7 @@ func Parse(d []byte, tokens []Token) []Token {
 
 	printRoot(root, 2)
 
-	return tokens
+	return root
 }
 
 func printRoot(root *Node, spaces int) {
