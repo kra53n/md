@@ -81,18 +81,12 @@ func Lex(d []byte) []Token {
 		if t.Type == TokenNil {
 			continue
 		}
-
-		var prv1, prv2 TokenType
-		if len(tokens) > 1 {
-			prv1 = tokens[len(tokens)-1].Type
-		}
-		if len(tokens) > 2 {
-			prv2 = tokens[len(tokens)-2].Type
-		}
-		if prv1 == prv2 && prv1 == t.Type && t.Type == TokenNewL {
+		if shouldSkipDueNewLRepetitions(tokens, &t) {
 			continue
-		} else if prv1 == TokenSpace && t.Type == TokenNewL {
+		}
+		if hasExcessSapce(tokens, &t) {
 			tokens = tokens[:len(tokens)-1]
+			continue
 		}
 		tokens = append(tokens, t)
 	}
@@ -337,7 +331,23 @@ func chopChar(c byte) bool {
 		return true
 	}
 	return false
+}
 
+func shouldSkipDueNewLRepetitions(tokens []Token, cur *Token) bool {
+	if len(tokens) < 2 {
+		return false
+	}
+	var prv1, prv2 TokenType
+	prv1 = tokens[len(tokens)-1].Type
+	prv2 = tokens[len(tokens)-2].Type
+	return prv1 == prv2 && prv1 == cur.Type && cur.Type == TokenNewL
+}
+
+func hasExcessSapce(tokens []Token, cur *Token) bool {
+	if len(tokens) < 1 {
+		return false
+	}
+	return tokens[len(tokens)-1].Type == TokenSpace && cur.Type == TokenNewL
 }
 
 func (t *Token) Print(d []byte) {
