@@ -47,40 +47,11 @@ func Lex(d []byte) []Token {
 	var tokens []Token
 	var t Token
 	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
-		switch l.Data[l.Pos] {
-		case '\r':
-			t = l.newL()
-		case ' ':
-			t = l.space()
-		case '#':
-			t = l.header()
-		case '*':
-			t = l.single(TokenAsterisk)
-		case '`':
-			t = l.single(TokenBacktick)
-		case '>':
-			t = l.single(TokenQuote)
-		case '_':
-			t = l.single(TokenUnderscore)
-		case '~':
-			t = l.single(TokenTilde)
-		case '!':
-			t = l.exclamationMark()
-		case '[':
-			t = l.openBrac()
-		case '-':
-			t = l.unorderedList('-')
-		case '+':
-			t = l.unorderedList('+')
-		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			t = l.digit()
-		default:
+		t = l.single()
+		if t.Type == TokenNil {
 			t = l.plainText()
 		}
 
-		if t.Type == TokenNil {
-			continue
-		}
 		if shouldSkipDueNewLRepetitions(tokens, &t) {
 			continue
 		}
@@ -95,6 +66,39 @@ func Lex(d []byte) []Token {
 	}
 	tokens = tokens[:i+1]
 	return tokens
+}
+
+func (l *Lexer) single() Token {
+	switch l.Data[l.Pos] {
+	case '\r':
+		return l.newL()
+	case ' ':
+		return l.space()
+	case '#':
+		return l.header()
+	case '*':
+		return l.charToken(TokenAsterisk)
+	case '`':
+		return l.charToken(TokenBacktick)
+	case '>':
+		return l.charToken(TokenQuote)
+	case '_':
+		return l.charToken(TokenUnderscore)
+	case '~':
+		return l.charToken(TokenTilde)
+	case '!':
+		return l.exclamationMark()
+	case '[':
+		return l.openBrac()
+	case '-':
+		return l.unorderedList('-')
+	case '+':
+		return l.unorderedList('+')
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return l.digit()
+	default:
+		return Token{}
+	}
 }
 
 func (l *Lexer) newL() Token {
@@ -161,7 +165,7 @@ Ok:
 	return t
 }
 
-func (l *Lexer) single(tp TokenType) Token {
+func (l *Lexer) charToken(tp TokenType) Token {
 	return Token{
 		Type:  tp,
 		Start: l.Pos,
@@ -172,7 +176,7 @@ func (l *Lexer) single(tp TokenType) Token {
 
 func (l *Lexer) exclamationMark() Token {
 	if l.Pos+1 < len(l.Data) && l.Data[l.Pos+1] != '[' {
-		return l.single(TokenPlainText)
+		return l.charToken(TokenPlainText)
 	}
 	openBracs := 1
 	i := l.Pos + 2
@@ -185,7 +189,7 @@ func (l *Lexer) exclamationMark() Token {
 		}
 	}
 	if openBracs != 0 || i >= len(l.Data) || l.Data[i] != '(' {
-		return l.single(TokenPlainText)
+		return l.charToken(TokenPlainText)
 	}
 	i++
 	openBracs = 0
@@ -208,7 +212,7 @@ func (l *Lexer) exclamationMark() Token {
 			return t
 		}
 	}
-	return l.single(TokenPlainText)
+	return l.charToken(TokenPlainText)
 }
 
 func (l *Lexer) openBrac() Token {
@@ -223,14 +227,14 @@ func (l *Lexer) openBrac() Token {
 		}
 	}
 	if openBracs != 0 || l.Data[i] != '(' {
-		return l.single(TokenPlainText)
+		return l.charToken(TokenPlainText)
 	}
 	i++
 	openBracs = 0
 	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
 		switch l.Data[i] {
 		case '(':
-			return l.single(TokenPlainText)
+			return l.charToken(TokenPlainText)
 		case ')':
 			t := Token{
 				Type:  TokenLink,
@@ -242,7 +246,7 @@ func (l *Lexer) openBrac() Token {
 			return t
 		}
 	}
-	return l.single(TokenPlainText)
+	return l.charToken(TokenPlainText)
 }
 
 func (l *Lexer) unorderedList(b byte) Token {
