@@ -6,14 +6,12 @@ type Lexer struct {
 	Data []byte
 	Pos  int
 	Bol  int
-	Row  int
 }
 
 type Token struct {
 	Type  TokenType
 	Start int
 	End   int
-	Row   int
 }
 
 type TokenType int
@@ -38,6 +36,13 @@ const (
 	TokenImg
 	TokenUnorderedList
 	TokenOrderedList
+	TokenTableStart
+	TokenTableLeftAlign
+	TokenTableCenterAlign
+	TokenTableRightAlign
+	TokenTableRow
+	TokenTableCol
+	TokenTableEnd
 )
 
 func Lex(d []byte) []Token {
@@ -47,6 +52,11 @@ func Lex(d []byte) []Token {
 	var tokens []Token
 	var t Token
 	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
+		var isTable bool
+		tokens, isTable = l.table(tokens)
+		if isTable {
+			continue
+		}
 		t = l.single()
 		if t.Type == TokenNil {
 			t = l.plainText()
@@ -65,6 +75,244 @@ func Lex(d []byte) []Token {
 	for ; i > 0 && tokens[i].Type == TokenNewL; i-- {
 	}
 	tokens = tokens[:i+1]
+	return tokens
+}
+
+func (l *Lexer) table(tokens []Token) ([]Token, bool) {
+	start := l.lineBeginning()
+
+	if !l.isTable(start) {
+		return tokens, false
+	}
+
+	tokens = append(tokens, Token{Type: TokenTableStart})
+	{
+		var headerPipes, i, tableDataPipes int
+		headerPipes, _ = l.tableGetPipesNum(start)
+		tokens = l.tableAppendHeaders(tokens, headerPipes, i)
+		i = l.skipLine(start)
+		i = l.skipLine(i)
+		for tableDataPipes, _ = l.tableGetPipesNum(i); tableDataPipes == headerPipes; {
+			tokens = l.tableAppendData(tokens, headerPipes, i)
+			i = l.skipLine(i)
+			tableDataPipes, _ = l.tableGetPipesNum(i)
+		}
+		l.Pos = i - 1
+	}
+	tokens = append(tokens, Token{Type: TokenTableEnd})
+
+	return tokens, true
+}
+
+func (l *Lexer) lineBeginning() int {
+	i := l.Pos
+	for ; i != 0 && l.Data[i] != '\n'; i-- {
+	}
+	i--
+	if i < 1 {
+		i = 0
+	}
+	return i
+}
+
+func (l *Lexer) skipLine(pos int) int {
+	i := pos
+	for ; i < len(l.Data); i++ {
+		if l.Data[i] == '\r' {
+			return i + 2
+		}
+	}
+	return i
+}
+
+func (l *Lexer) isTable(start int) bool {
+	var i, headerPipes, alignPipes int
+	i = start
+	headerPipes, i = l.tableGetPipesNum(i)
+	if headerPipes == 0 {
+		return false
+	}
+	i += 2
+	alignPipes, _ = l.tableGetPipesNum(i)
+	if alignPipes == 0 || headerPipes != alignPipes {
+		return false
+	}
+	return l.isTableAlignsCorrect(i)
+}
+
+func (l *Lexer) tableGetPipesNum(start int) (int, int) {
+	var i, pipes int
+	i = start
+	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+		if l.Data[i] == '|' && !l.tableIgnorePipe(i) {
+			pipes++
+		}
+	}
+	return pipes, i
+}
+
+func (l *Lexer) tableIgnorePipe(pos int) bool {
+	if pos-1 < 0 ||
+		(pos == 0 || l.Data[pos-1] == '\n') && pos+1 < len(l.Data) && l.Data[pos+1] == ' ' ||
+		pos+1 < len(l.Data) && l.Data[pos+1] == '\r' && l.chopChar(pos-1) {
+		return true
+	}
+	return l.Data[pos-1] == '\\'
+}
+
+func (l *Lexer) isTableAlignsCorrect(start int) bool {
+	for i := start; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+		if l.tableIgnorePipe(i) || l.chopChar(i) || l.Data[i] == '-' {
+			continue
+		}
+		if l.Data[i] == ':' &&
+			!(i-1 < 0 || l.Data[i-1] == '\n' || l.chopChar(i-1) ||
+				i+1 == len(l.Data) || l.Data[i+1] == '\r' || l.chopChar(i+1)) {
+			return false
+		}
+		if i+1 != len(l.Data) && l.chopChar(i+1) && l.Data[i] != '|' {
+			i++
+			for ; i < len(l.Data) && l.Data[i] != '-' && l.Data[i] != '|' && l.Data[i] != '\r'; i++ {
+			}
+			if l.Data[i] == '-' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (l *Lexer) tableAppendHeaders(tokens []Token, pipes int, pos int) []Token {
+	var iHeaders, iAligns int
+	iHeaders = pos
+	iAligns = l.skipLine(pos)
+	for ; pipes >= 0; pipes-- {
+		var startHeader, startAlign int
+
+		startHeader = iHeaders
+		startAlign = iAligns
+
+		iHeaders = l.tableNxtPipe(iHeaders) - 1
+		iAligns = l.tableNxtPipe(iAligns) - 1
+
+		startHeader = l.tableLTrim(startHeader)
+		iHeaders = l.tableRTrim(iHeaders)
+
+		tokens = append(tokens, Token{
+			Type:  l.tableGetAlignType(l.tableLTrim(startAlign), l.tableRTrim(iAligns)),
+			Start: startHeader,
+			End:   startHeader,
+		})
+
+		var t Token
+		for l.Pos = startHeader; l.Pos < iHeaders; l.Pos++ {
+			t = l.single()
+			if t.Type == TokenNil {
+				t = l.plainText()
+			}
+			tokens = append(tokens, t)
+		}
+
+		iHeaders = l.tableNxtPipe(iHeaders) + 1
+		iAligns = l.tableNxtPipe(iAligns) + 1
+	}
+	return tokens
+}
+
+func (l *Lexer) tableNxtPipe(pos int) int {
+	var i int = pos
+	for ; (l.Data[i] != '|' && !l.eol(i)) || l.tableIgnorePipe(i); i++ {
+	}
+	return i
+}
+
+func (l *Lexer) tableLTrim(beg int) int {
+	if l.tableIgnorePipe(beg) {
+		beg++
+	}
+	beg = l.lTrim(beg)
+	return beg
+}
+
+func (l *Lexer) tableRTrim(end int) int {
+	if l.Data[end] == '\r' {
+		end--
+	}
+	if l.tableIgnorePipe(end) {
+		end--
+	}
+	end = l.rTrim(end)
+	return end
+}
+
+func (l *Lexer) eol(pos int) bool {
+	switch l.Data[pos] {
+	case '\r', '\n', 0:
+		return true
+	}
+	return false
+}
+
+func (l *Lexer) tableGetAlignType(beg int, end int) TokenType {
+	if l.Data[beg] == ':' && l.Data[end-1] == ':' {
+		return TokenTableCenterAlign
+	} else if l.Data[beg] == ':' {
+		return TokenTableLeftAlign
+	} else if l.Data[end-1] == ':' {
+		return TokenTableRightAlign
+	} else {
+		return TokenTableCenterAlign
+	}
+}
+
+func (l *Lexer) lTrim(beg int) int {
+	i := beg
+	for ; i < len(l.Data) && l.chopChar(i); i++ {
+	}
+	return i
+}
+
+func (l *Lexer) rTrim(end int) int {
+	i := end
+	for ; i > 0; i-- {
+		if !l.chopChar(i) {
+			return i + 1
+		}
+	}
+	return i
+}
+
+func (l *Lexer) tableAppendData(tokens []Token, pipes int, pos int) []Token {
+	i := pos
+	tokens = append(tokens, Token{
+		Type:  TokenTableRow,
+		Start: i,
+		End:   i,
+	})
+	for ; pipes >= 0; pipes-- {
+		var start int = i
+
+		i = l.tableNxtPipe(i)
+
+		start = l.tableLTrim(start)
+
+		i = l.tableRTrim(i - 1)
+
+		tokens = append(tokens, Token{
+			Type:  TokenTableCol,
+			Start: start,
+			End:   start,
+		})
+		var t Token
+		for l.Pos = start; l.Pos < i; l.Pos++ {
+			t = l.single()
+			if t.Type == TokenNil {
+				t = l.plainText()
+			}
+			tokens = append(tokens, t)
+		}
+		i = l.tableNxtPipe(i) + 1
+	}
 	return tokens
 }
 
@@ -107,9 +355,7 @@ func (l *Lexer) newL() Token {
 		t.Type = TokenNewL
 		t.Start = l.Pos
 		t.End = l.Pos + 2
-		t.Row = l.Row
 		l.Pos++
-		l.Row++
 		return t
 	}
 	return t
@@ -123,14 +369,13 @@ func (l *Lexer) space() Token {
 		Type:  TokenSpace,
 		Start: l.Pos,
 		End:   i,
-		Row:   l.Row,
 	}
 	l.Pos = i - 1
 	return t
 }
 
 func (l *Lexer) header() Token {
-	t := Token{Row: l.Row}
+	t := Token{}
 	i := l.Pos
 	for ; i < len(l.Data); i++ {
 		switch {
@@ -149,7 +394,7 @@ func (l *Lexer) header() Token {
 CheckContent:
 	for j := i; j < len(l.Data); j++ {
 		switch {
-		case chopChar(l.Data[j]):
+		case l.chopChar(j):
 			continue
 		case l.Data[j] == '\r':
 			return t
@@ -170,7 +415,6 @@ func (l *Lexer) charToken(tp TokenType) Token {
 		Type:  tp,
 		Start: l.Pos,
 		End:   l.Pos + 1,
-		Row:   l.Row,
 	}
 }
 
@@ -206,7 +450,6 @@ func (l *Lexer) exclamationMark() Token {
 				Type:  TokenImg,
 				Start: l.Pos,
 				End:   i + 1,
-				Row:   l.Row,
 			}
 			l.Pos = i
 			return t
@@ -240,7 +483,6 @@ func (l *Lexer) openBrac() Token {
 				Type:  TokenLink,
 				Start: l.Pos,
 				End:   i + 1,
-				Row:   l.Row,
 			}
 			l.Pos = i
 			return t
@@ -254,7 +496,6 @@ func (l *Lexer) unorderedList(b byte) Token {
 		Type:  TokenUnorderedList,
 		Start: l.Pos,
 		End:   l.Pos + 1,
-		Row:   l.Row,
 	}
 	if l.Pos == 0 {
 		return t
@@ -277,7 +518,6 @@ func (l *Lexer) digit() Token {
 		Type:  TokenOrderedList,
 		Start: l.Pos,
 		End:   l.Pos + 1,
-		Row:   l.Row,
 	}
 	i := l.Pos
 	for ; i > 0 && l.Data[i] == ' '; i-- {
@@ -293,16 +533,23 @@ func (l *Lexer) digit() Token {
 			continue
 		}
 		switch c {
-		case ' ', '\r', 0:
-			t.Type = TokenPlainText
-			t.Start = l.Pos
-			t.End = i
-			l.Pos = i - 1
-			return t
+		// TODO(kra53n): check one different cases
+		// case ' ', '\r', 0:
+		// 	t.Type = TokenPlainText
+		// 	t.Start = l.Pos
+		// 	t.End = i
+		// 	l.Pos = i - 1
+		// 	return t
 		case '.', ')':
 			t.Start = l.Pos
 			t.End = i + 1
 			l.Pos = i
+			return t
+		default:
+			t.Type = TokenPlainText
+			t.Start = l.Pos
+			t.End = i
+			l.Pos = i - 1
 			return t
 		}
 	}
@@ -323,14 +570,14 @@ End:
 		Type:  TokenPlainText,
 		Start: l.Pos,
 		End:   i,
-		Row:   l.Row,
 	}
 	l.Pos = i - 1
 	return t
 }
 
-func chopChar(c byte) bool {
-	switch c {
+// TODO(kra53n): rename to skipChar
+func (l *Lexer) chopChar(pos int) bool {
+	switch l.Data[pos] {
 	case ' ', '\t':
 		return true
 	}
@@ -355,5 +602,5 @@ func hasExcessSapce(tokens []Token, cur *Token) bool {
 }
 
 func (t *Token) Print(d []byte) {
-	fmt.Printf("Type: %d Val: %s(%d, %d) Row: %d\n", t.Type, d[t.Start:t.End], t.Start, t.End, t.Row)
+	fmt.Printf("Type: %d Val: %s(%d, %d)\n", t.Type, d[t.Start:t.End], t.Start, t.End)
 }
