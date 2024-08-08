@@ -5,7 +5,6 @@ import "fmt"
 type Lexer struct {
 	Data []byte
 	Pos  int
-	Bol  int
 }
 
 type Token struct {
@@ -51,8 +50,8 @@ func Lex(d []byte) []Token {
 
 	var tokens []Token
 	var t Token
+	var isTable bool
 	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
-		var isTable bool
 		tokens, isTable = l.table(tokens)
 		if isTable {
 			continue
@@ -72,7 +71,8 @@ func Lex(d []byte) []Token {
 		tokens = append(tokens, t)
 	}
 	i := len(tokens) - 1
-	for ; i > 0 && tokens[i].Type == TokenNewL; i-- {
+	for i > 0 && tokens[i].Type == TokenNewL {
+		i--
 	}
 	tokens = tokens[:i+1]
 	return tokens
@@ -104,9 +104,43 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	return tokens, true
 }
 
+func (l *Lexer) single() Token {
+	switch l.Data[l.Pos] {
+	case '\r':
+		return l.newL()
+	case ' ':
+		return l.space()
+	case '#':
+		return l.header()
+	case '*':
+		return l.charToken(TokenAsterisk)
+	case '`':
+		return l.charToken(TokenBacktick)
+	case '>':
+		return l.charToken(TokenQuote)
+	case '_':
+		return l.charToken(TokenUnderscore)
+	case '~':
+		return l.charToken(TokenTilde)
+	case '!':
+		return l.exclamationMark()
+	case '[':
+		return l.openBrac()
+	case '-':
+		return l.unorderedList('-')
+	case '+':
+		return l.unorderedList('+')
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return l.digit()
+	default:
+		return Token{}
+	}
+}
+
 func (l *Lexer) lineBeginning() int {
 	i := l.Pos
-	for ; i != 0 && l.Data[i] != '\n'; i-- {
+	for i != 0 && l.Data[i] != '\n' {
+		i--
 	}
 	i--
 	if i < 1 {
@@ -115,14 +149,54 @@ func (l *Lexer) lineBeginning() int {
 	return i
 }
 
+func (l *Lexer) eol(pos int) bool {
+	switch l.Data[pos] {
+	case '\r', '\n', 0:
+		return true
+	}
+	return false
+}
+
 func (l *Lexer) skipLine(pos int) int {
 	i := pos
-	for ; i < len(l.Data); i++ {
+	for i < len(l.Data) {
 		if l.Data[i] == '\r' {
 			return i + 2
 		}
+		i++
 	}
 	return i
+}
+
+func (l *Lexer) lTrim(beg int) int {
+	i := beg
+	for i < len(l.Data) && l.skipChar(i) {
+		i++
+	}
+	return i
+}
+
+func (l *Lexer) rTrim(end int) int {
+	i := end
+	for i > 0 {
+		if !l.skipChar(i) {
+			return i + 1
+		}
+		i--
+	}
+	return i
+}
+
+func (l *Lexer) skipChar(pos int) bool {
+	switch l.Data[pos] {
+	case ' ', '\t':
+		return true
+	}
+	return false
+}
+
+func (t *Token) Print(d []byte) {
+	fmt.Printf("Type: %d Val: %s(%d, %d)\n", t.Type, d[t.Start:t.End], t.Start, t.End)
 }
 
 func (l *Lexer) isTable(start int) bool {
@@ -143,10 +217,11 @@ func (l *Lexer) isTable(start int) bool {
 func (l *Lexer) tableGetPipesNum(start int) (int, int) {
 	var i, pipes int
 	i = start
-	for ; i < len(l.Data) && l.Data[i] != '\r'; i++ {
+	for i < len(l.Data) && l.Data[i] != '\r' {
 		if l.Data[i] == '|' && !l.tableIgnorePipe(i) {
 			pipes++
 		}
+		i++
 	}
 	return pipes, i
 }
@@ -154,7 +229,7 @@ func (l *Lexer) tableGetPipesNum(start int) (int, int) {
 func (l *Lexer) tableIgnorePipe(pos int) bool {
 	if pos-1 < 0 ||
 		(pos == 0 || l.Data[pos-1] == '\n') && pos+1 < len(l.Data) && l.Data[pos+1] == ' ' ||
-		pos+1 < len(l.Data) && l.Data[pos+1] == '\r' && l.chopChar(pos-1) {
+		pos+1 < len(l.Data) && l.Data[pos+1] == '\r' && l.skipChar(pos-1) {
 		return true
 	}
 	return l.Data[pos-1] == '\\'
@@ -162,15 +237,15 @@ func (l *Lexer) tableIgnorePipe(pos int) bool {
 
 func (l *Lexer) isTableAlignsCorrect(start int) bool {
 	for i := start; i < len(l.Data) && l.Data[i] != '\r'; i++ {
-		if l.tableIgnorePipe(i) || l.chopChar(i) || l.Data[i] == '-' {
+		if l.tableIgnorePipe(i) || l.skipChar(i) || l.Data[i] == '-' {
 			continue
 		}
 		if l.Data[i] == ':' &&
-			!(i-1 < 0 || l.Data[i-1] == '\n' || l.chopChar(i-1) ||
-				i+1 == len(l.Data) || l.Data[i+1] == '\r' || l.chopChar(i+1)) {
+			!(i-1 < 0 || l.Data[i-1] == '\n' || l.skipChar(i-1) ||
+				i+1 == len(l.Data) || l.Data[i+1] == '\r' || l.skipChar(i+1)) {
 			return false
 		}
-		if i+1 != len(l.Data) && l.chopChar(i+1) && l.Data[i] != '|' {
+		if i+1 != len(l.Data) && l.skipChar(i+1) && l.Data[i] != '|' {
 			i++
 			for ; i < len(l.Data) && l.Data[i] != '-' && l.Data[i] != '|' && l.Data[i] != '\r'; i++ {
 			}
@@ -245,14 +320,6 @@ func (l *Lexer) tableRTrim(end int) int {
 	return end
 }
 
-func (l *Lexer) eol(pos int) bool {
-	switch l.Data[pos] {
-	case '\r', '\n', 0:
-		return true
-	}
-	return false
-}
-
 func (l *Lexer) tableGetAlignType(beg int, end int) TokenType {
 	if l.Data[beg] == ':' && l.Data[end-1] == ':' {
 		return TokenTableCenterAlign
@@ -263,23 +330,6 @@ func (l *Lexer) tableGetAlignType(beg int, end int) TokenType {
 	} else {
 		return TokenTableCenterAlign
 	}
-}
-
-func (l *Lexer) lTrim(beg int) int {
-	i := beg
-	for ; i < len(l.Data) && l.chopChar(i); i++ {
-	}
-	return i
-}
-
-func (l *Lexer) rTrim(end int) int {
-	i := end
-	for ; i > 0; i-- {
-		if !l.chopChar(i) {
-			return i + 1
-		}
-	}
-	return i
 }
 
 func (l *Lexer) tableAppendData(tokens []Token, pipes int, pos int) []Token {
@@ -316,39 +366,6 @@ func (l *Lexer) tableAppendData(tokens []Token, pipes int, pos int) []Token {
 	return tokens
 }
 
-func (l *Lexer) single() Token {
-	switch l.Data[l.Pos] {
-	case '\r':
-		return l.newL()
-	case ' ':
-		return l.space()
-	case '#':
-		return l.header()
-	case '*':
-		return l.charToken(TokenAsterisk)
-	case '`':
-		return l.charToken(TokenBacktick)
-	case '>':
-		return l.charToken(TokenQuote)
-	case '_':
-		return l.charToken(TokenUnderscore)
-	case '~':
-		return l.charToken(TokenTilde)
-	case '!':
-		return l.exclamationMark()
-	case '[':
-		return l.openBrac()
-	case '-':
-		return l.unorderedList('-')
-	case '+':
-		return l.unorderedList('+')
-	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		return l.digit()
-	default:
-		return Token{}
-	}
-}
-
 func (l *Lexer) newL() Token {
 	t := Token{}
 	if l.Pos < len(l.Data)-1 && l.Data[l.Pos+1] == '\n' {
@@ -363,7 +380,8 @@ func (l *Lexer) newL() Token {
 
 func (l *Lexer) space() Token {
 	i := l.Pos
-	for ; i < len(l.Data) && l.Data[i] == ' '; i++ {
+	for i < len(l.Data) && l.Data[i] == ' ' {
+		i++
 	}
 	t := Token{
 		Type:  TokenSpace,
@@ -394,7 +412,7 @@ func (l *Lexer) header() Token {
 CheckContent:
 	for j := i; j < len(l.Data); j++ {
 		switch {
-		case l.chopChar(j):
+		case l.skipChar(j):
 			continue
 		case l.Data[j] == '\r':
 			return t
@@ -501,7 +519,8 @@ func (l *Lexer) unorderedList(b byte) Token {
 		return t
 	}
 	i := l.Pos - 1
-	for ; i > 0 && l.Data[i] == ' '; i-- {
+	for i > 0 && l.Data[i] == ' ' {
+		i--
 	}
 	if i == l.Pos-1 {
 		i++
@@ -520,7 +539,8 @@ func (l *Lexer) digit() Token {
 		End:   l.Pos + 1,
 	}
 	i := l.Pos
-	for ; i > 0 && l.Data[i] == ' '; i-- {
+	for i > 0 && l.Data[i] == ' ' {
+		i--
 	}
 	if !(i == l.Pos && i == 0 || l.Data[i] != '\r') {
 		t.Type = TokenPlainText
@@ -575,15 +595,6 @@ End:
 	return t
 }
 
-// TODO(kra53n): rename to skipChar
-func (l *Lexer) chopChar(pos int) bool {
-	switch l.Data[pos] {
-	case ' ', '\t':
-		return true
-	}
-	return false
-}
-
 func shouldSkipDueNewLRepetitions(tokens []Token, cur *Token) bool {
 	if len(tokens) < 2 {
 		return false
@@ -599,8 +610,4 @@ func hasExcessSapce(tokens []Token, cur *Token) bool {
 		return false
 	}
 	return tokens[len(tokens)-1].Type == TokenSpace && cur.Type == TokenNewL
-}
-
-func (t *Token) Print(d []byte) {
-	fmt.Printf("Type: %d Val: %s(%d, %d)\n", t.Type, d[t.Start:t.End], t.Start, t.End)
 }
