@@ -42,6 +42,12 @@ const (
 	TokenTableRow
 	TokenTableCol
 	TokenTableEnd
+	TokenCodeLine
+	TokenCodeBlock
+	TokenBold
+	TokenItalic
+	TokenBoldItalic
+	TokenStrikeThrough
 )
 
 func Lex(d []byte) []Token {
@@ -70,12 +76,7 @@ func Lex(d []byte) []Token {
 		}
 		tokens = append(tokens, t)
 	}
-	i := len(tokens) - 1
-	for i > 0 && tokens[i].Type == TokenNewL {
-		i--
-	}
-	tokens = tokens[:i+1]
-	return tokens
+	return analyze(d, tokens)
 }
 
 func (l *Lexer) table(tokens []Token) ([]Token, bool) {
@@ -610,4 +611,68 @@ func hasExcessSapce(tokens []Token, cur *Token) bool {
 		return false
 	}
 	return tokens[len(tokens)-1].Type == TokenSpace && cur.Type == TokenNewL
+}
+
+func analyze(d []byte, tokens []Token) []Token {
+	tokens = delExtraNewLinesAtTheEnd(tokens)
+	for i := 0; i < len(tokens); i++ {
+		switch tokens[i].Type {
+		// TODO(kra53n): look at the spaces in TokenUnorderedList, TokenOrderedList
+		case TokenSpace:
+			tokens = analyzeSpace(tokens, i)
+		case TokenAsterisk:
+			tokens = analyzeAsterisk(tokens, i)
+		case TokenBacktick:
+			tokens = analyzeBacktick(tokens, i)
+		case TokenQuote:
+			tokens = analyzeQuote(tokens, i)
+		}
+	}
+	return tokens
+}
+
+func delExtraNewLinesAtTheEnd(tokens []Token) []Token {
+	i := len(tokens) - 1
+	for i > 0 && tokens[i].Type == TokenNewL {
+		i--
+	}
+	return tokens[:i+1]
+}
+
+func shiftTokens(tokens []Token, beg int, end int) []Token {
+	i := beg
+	for (i < end) && (i + end - beg < len(tokens)) {
+		tokens[i] = tokens[i + end - beg]
+		i++
+	}
+	return tokens[:i+1]
+}
+
+func analyzeSpace(tokens []Token, pos int) []Token {
+	cur := tokens[pos]
+	if (cur.End - cur.Start >= 4) && (pos == 0 || tokens[pos-1].Type == TokenNewL) {
+		i := pos + 1
+		for i < len(tokens) && tokens[i].Type != TokenNewL {
+			i++
+		}
+		tokens[pos] = Token{
+			Type: TokenCodeBlock,
+			Start: cur.Start,
+			End: tokens[i].End,
+		}
+		tokens = shiftTokens(tokens, pos+1, i+1)
+	}
+	return tokens
+}
+
+func analyzeAsterisk(tokens []Token, pos int) []Token {
+	return tokens
+}
+
+func analyzeBacktick(tokens []Token, pos int) []Token {
+	return tokens
+}
+
+func analyzeQuote(tokens []Token, pos int) []Token {
+	return tokens
 }
