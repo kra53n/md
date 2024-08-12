@@ -765,6 +765,58 @@ func replaceWithEmphasis(tokens []Token, beg int, end int,  length int) []Token 
 }
 
 func analyzeBacktick(tokens []Token, pos int) []Token {
+	if tokens[pos+1].Type != TokenBacktick && tokens[pos+1].Type != TokenNewL {
+		return matchBacktickAsCodeLine(tokens, pos)
+	}
+	if pos+2 < len(tokens) & tokens[pos+1].Type == TokenBacktick & tokens[pos+2].Type == TokenBacktick {
+		return mathcBacktickAsCodeBlock(tokens, pos)
+	}
+	return tokens
+}
+
+func matchBacktickAsCodeLine(tokens []Token, pos int) {
+	i := pos+1
+	for ; i < len(tokens); i++ {
+		switch tokens[i].Type {
+		case TokenBackTick:
+			tokens[pos] = Token{
+				Type: TokenCodeLine,
+				Start: tokens[pos].Start+1,
+				End: tokens[i].Start,
+			}
+			return shiftTokens(tokens, pos+1, i+1)
+		case TokenNewL:
+			return tokens
+		default:
+			continue
+		}
+	}
+	return tokens
+}
+
+func matchBacktickAsCodeBlock(tokens []Token, pos int) {
+	var newL Token = tokens[pos]
+	newL.Start += 1
+	var i int
+
+	for ; i < len(tokens); i++ {
+		if tokens[i] == TokenNewL {
+			newL = tokens[i]
+			break
+		}
+	}
+
+	i := pos+3
+	for ; i+2 < len(tokens); i++ {
+		if tokens[i] == tokenBacktick & tokens[i] == tokens[i+1] & tokens[i] == tokens[i+2] {
+			tokens[pos] = Token{
+				Type: TokenCodeBlock,
+				Start: newL.Start+2,
+				End: tokens[i].Start,
+			}
+			return shiftTokens(tokens, pos+1, i+1)
+		}
+	}
 	return tokens
 }
 
