@@ -44,9 +44,10 @@ const (
 	TokenTableEnd
 	TokenCodeLine
 	TokenCodeBlock
-	TokenBold
-	TokenItalic
-	TokenBoldItalic
+	TokenBoldStart
+	TokenBoldEnd
+	TokenItalicStart
+	TokenItalicEnd
 	TokenStrikeThrough
 )
 
@@ -620,8 +621,8 @@ func analyze(d []byte, tokens []Token) []Token {
 		// TODO(kra53n): look at the spaces in TokenUnorderedList, TokenOrderedList
 		case TokenSpace:
 			tokens = analyzeSpace(tokens, i)
-		case TokenAsterisk:
-			tokens = analyzeAsterisk(tokens, i)
+		case TokenAsterisk, TokenUnderscore:
+			tokens = analyzeAsteriskAndUnderscore(tokens, i)
 		case TokenBacktick:
 			tokens = analyzeBacktick(tokens, i)
 		case TokenQuote:
@@ -641,11 +642,11 @@ func delExtraNewLinesAtTheEnd(tokens []Token) []Token {
 
 func shiftTokens(tokens []Token, beg int, end int) []Token {
 	i := beg
-	for (i < end) && (i + end - beg < len(tokens)) {
+	for i + end - beg < len(tokens) {
 		tokens[i] = tokens[i + end - beg]
 		i++
 	}
-	return tokens[:i+1]
+	return tokens[:len(tokens)-(end-beg)]
 }
 
 func analyzeSpace(tokens []Token, pos int) []Token {
@@ -665,7 +666,101 @@ func analyzeSpace(tokens []Token, pos int) []Token {
 	return tokens
 }
 
-func analyzeAsterisk(tokens []Token, pos int) []Token {
+func analyzeAsteriskAndUnderscore(tokens []Token, pos int) []Token {
+	var t TokenType = tokens[pos].Type
+	var i, countBeg, countEnd, count int
+
+	i = pos+1
+	if i >= len(tokens) {
+		return tokens
+	}
+
+	i, countBeg = matchBoldOrItalicBeg(tokens, i, t)
+	if countBeg == 0 {
+		return tokens
+	}
+	for ; i < len(tokens) && tokens[i].Type != t; i++ {
+	}
+	i++
+	i, countEnd = matchBoldOrItalicEnd(tokens, i, t)
+	if countEnd == 0 {
+		return tokens
+	}
+
+	count = min(countBeg, countEnd)
+	tokens = replaceWithEmphasis(tokens, pos, i-countEnd, count)
+	
+	return tokens
+}
+
+func matchBoldOrItalicBeg(tokens []Token, pos int, t TokenType) (int, int) {
+	i := pos
+	count := 1
+	for ; i < len(tokens); i++ {
+		if tokens[i].Type == t {
+			count++
+			continue
+		} else if tokens[i].Type == TokenAsterisk || tokens[i].Type == TokenUnderscore {
+			break
+		} else if tokens[i].Type == TokenSpace || tokens[i].Type == TokenNewL {
+			return 0, 0
+		} else {
+			break
+		}
+	}
+	if count > 2 {
+		count = 2
+	}
+	return i, count 
+}
+
+func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
+	i := pos
+	count := 1
+	for ; i < len(tokens); i++ {
+		if tokens[i].Type == t {
+			count++
+			if count > 2 {
+				count = 2
+				break
+			}
+		} else if tokens[i].Type == TokenAsterisk || tokens[i].Type == TokenUnderscore {
+			break
+		} else if tokens[i].Type == TokenNewL {
+			if i+1 >= len(tokens) || tokens[i+1].Type == TokenNewL {
+				return 0, 0
+			}
+			continue
+		} else {
+			continue
+		}
+	}
+	return i, count 
+}
+
+func replaceWithEmphasis(tokens []Token, beg int, end int,  length int) []Token {
+	var tStart, tEnd TokenType
+	tStart = TokenItalicStart
+	tEnd = TokenItalicEnd
+	if length == 2 {
+		tStart = TokenBoldStart
+		tEnd = TokenBoldEnd
+	}
+	tokens[beg] = Token{
+		Type: tStart,
+		Start: tokens[beg].Start,
+		End: tokens[beg].Start+length,
+	}
+	tokens[end] = Token{
+		Type: tEnd,
+		Start: tokens[end].Start,
+		End: tokens[end].Start+length,
+	}
+	if length == 1 {
+		return tokens
+	}
+	tokens = shiftTokens(tokens, end+1, end+2)
+	tokens = shiftTokens(tokens, beg+1, beg+2)
 	return tokens
 }
 
