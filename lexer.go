@@ -625,8 +625,6 @@ func analyze(d []byte, tokens []Token) []Token {
 			tokens = analyzeAsteriskAndUnderscore(tokens, i)
 		case TokenBacktick:
 			tokens = analyzeBacktick(tokens, i)
-		case TokenQuote:
-			tokens = analyzeQuote(tokens, i)
 		}
 	}
 	return tokens
@@ -768,17 +766,17 @@ func analyzeBacktick(tokens []Token, pos int) []Token {
 	if tokens[pos+1].Type != TokenBacktick && tokens[pos+1].Type != TokenNewL {
 		return matchBacktickAsCodeLine(tokens, pos)
 	}
-	if pos+2 < len(tokens) & tokens[pos+1].Type == TokenBacktick & tokens[pos+2].Type == TokenBacktick {
-		return mathcBacktickAsCodeBlock(tokens, pos)
+	if pos+2 < len(tokens) && tokens[pos+1].Type == TokenBacktick && tokens[pos+2].Type == TokenBacktick {
+		return matchBacktickAsCodeBlock(tokens, pos)
 	}
 	return tokens
 }
 
-func matchBacktickAsCodeLine(tokens []Token, pos int) {
+func matchBacktickAsCodeLine(tokens []Token, pos int) []Token {
 	i := pos+1
 	for ; i < len(tokens); i++ {
 		switch tokens[i].Type {
-		case TokenBackTick:
+		case TokenBacktick:
 			tokens[pos] = Token{
 				Type: TokenCodeLine,
 				Start: tokens[pos].Start+1,
@@ -794,21 +792,21 @@ func matchBacktickAsCodeLine(tokens []Token, pos int) {
 	return tokens
 }
 
-func matchBacktickAsCodeBlock(tokens []Token, pos int) {
+func matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 	var newL Token = tokens[pos]
 	newL.Start += 1
 	var i int
 
 	for ; i < len(tokens); i++ {
-		if tokens[i] == TokenNewL {
+		if tokens[i].Type == TokenNewL {
 			newL = tokens[i]
 			break
 		}
 	}
 
-	i := pos+3
+	i = pos+3
 	for ; i+2 < len(tokens); i++ {
-		if tokens[i] == tokenBacktick & tokens[i] == tokens[i+1] & tokens[i] == tokens[i+2] {
+		if tokens[i].Type == TokenBacktick && tokens[i].Type == tokens[i+1].Type && tokens[i].Type == tokens[i+2].Type {
 			tokens[pos] = Token{
 				Type: TokenCodeBlock,
 				Start: newL.Start+2,
@@ -817,9 +815,5 @@ func matchBacktickAsCodeBlock(tokens []Token, pos int) {
 			return shiftTokens(tokens, pos+1, i+1)
 		}
 	}
-	return tokens
-}
-
-func analyzeQuote(tokens []Token, pos int) []Token {
 	return tokens
 }
