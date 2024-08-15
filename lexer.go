@@ -36,6 +36,10 @@ const (
 	TokenUnorderedList
 	TokenOrderedList
 	TokenTableStart
+	TokenTableHeaderStart
+	TokenTableHeaderEnd
+	TokenTableBodyStart
+	TokenTableBodyEnd
 	TokenTableLeftAlign
 	TokenTableCenterAlign
 	TokenTableRightAlign
@@ -91,15 +95,24 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	{
 		var headerPipes, i, tableDataPipes int
 		headerPipes, _ = l.tableGetPipesNum(start)
-		tokens = l.tableAppendHeaders(tokens, headerPipes, i)
-		i = l.skipLine(start)
-		i = l.skipLine(i)
-		for tableDataPipes, _ = l.tableGetPipesNum(i); tableDataPipes == headerPipes; {
-			tokens = l.tableAppendData(tokens, headerPipes, i)
-			i = l.skipLine(i)
-			tableDataPipes, _ = l.tableGetPipesNum(i)
+		tokens = append(tokens, Token{Type: TokenTableHeaderStart})
+		{
+			tokens = l.tableAppendHeaders(tokens, headerPipes, i)
 		}
-		l.Pos = i - 1
+		tokens = append(tokens, Token{Type: TokenTableHeaderEnd})
+
+		tokens = append(tokens, Token{Type: TokenTableBodyStart})
+		{
+			i = l.skipLine(start)
+			i = l.skipLine(i)
+			for tableDataPipes, _ = l.tableGetPipesNum(i); tableDataPipes == headerPipes; {
+				tokens = l.tableAppendData(tokens, headerPipes, i)
+				i = l.skipLine(i)
+				tableDataPipes, _ = l.tableGetPipesNum(i)
+			}
+			l.Pos = i - 1
+		}
+		tokens = append(tokens, Token{Type: TokenTableBodyEnd})
 	}
 	tokens = append(tokens, Token{Type: TokenTableEnd})
 
@@ -151,7 +164,14 @@ func (l *Lexer) lineBeginning() int {
 	return i
 }
 
+func (l *Lexer) eof(pos int) bool {
+	return pos >= len(l.Data)
+}
+
 func (l *Lexer) eol(pos int) bool {
+	if l.eof(pos) {
+		return true
+	}
 	switch l.Data[pos] {
 	case '\r', '\n', 0:
 		return true
@@ -219,7 +239,7 @@ func (l *Lexer) isTable(start int) bool {
 func (l *Lexer) tableGetPipesNum(start int) (int, int) {
 	var i, pipes int
 	i = start
-	for i < len(l.Data) && l.Data[i] != '\r' {
+	for !l.eol(i) {
 		if l.Data[i] == '|' && !l.tableIgnorePipe(i) {
 			pipes++
 		}
@@ -263,6 +283,7 @@ func (l *Lexer) tableAppendHeaders(tokens []Token, pipes int, pos int) []Token {
 	var iHeaders, iAligns int
 	iHeaders = pos
 	iAligns = l.skipLine(pos)
+	tokens = append(tokens, Token{Type: TokenTableRow})
 	for ; pipes >= 0; pipes-- {
 		var startHeader, startAlign int
 
@@ -677,7 +698,14 @@ func analyzeAsteriskAndUnderscore(tokens []Token, pos int) []Token {
 	if countBeg == 0 {
 		return tokens
 	}
-	for ; i < len(tokens) && tokens[i].Type != t; i++ {
+Loop:
+	for ; i < len(tokens); i++ {
+		switch tokens[i].Type {
+		case t:
+			break Loop
+		case TokenTableCol:
+			return tokens
+		}
 	}
 	i++
 	i, countEnd = matchBoldOrItalicEnd(tokens, i, t)
@@ -737,6 +765,9 @@ func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
 }
 
 func replaceWithEmphasis(tokens []Token, beg int, end int,  length int) []Token {
+	if end >= len(tokens) {
+		return tokens
+	}
 	var tStart, tEnd TokenType
 	tStart = TokenItalicStart
 	tEnd = TokenItalicEnd

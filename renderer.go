@@ -17,49 +17,52 @@ func recursiveTraversal(res *string, d []byte, n *Node, ptr *[]Token) {
 	if n == nil {
 		return
 	}
+	var tag string
 	for i := n.FstChd; i != nil; i = i.Nxt {
 		*ptr = append(*ptr, i.T)
-		*res = *res + getOpenedTag(d, &i.T)
+		_, tag = getOpenedTag(d, &i.T)
+		*res = *res + tag
 		recursiveTraversal(res, d, i, ptr)
 	}
 	if len(*ptr) > 0 {
-		*res += getClosedTag(&(*ptr)[len(*ptr)-1])
+		_, tag = getClosedTag(&(*ptr)[len(*ptr)-1])
+		*res += tag
 		*ptr = (*ptr)[:len(*ptr)-1]
 	}
 }
 
-func getOpenedTag(d []byte, t *Token) string {
-	switch t.Type {
-	case TokenH1:
-		return "<h1>"
-	case TokenH2:
-		return "<h2>"
-	case TokenH3:
-		return "<h3>"
-	case TokenBacktick:
-		return "<code>"
-	case TokenAsterisk:
-		return "<i>"
-	case TokenSpace:
-		return " "
-	case TokenPlainText:
-		return string(d[t.Start:t.End])
-	}
-	return ""
+var tagNames map[TokenType]string = map[TokenType]string{
+	TokenH1: "h1",
+	TokenH2: "h2",
+	TokenH3: "h3",
+	TokenH4: "h4",
+	TokenH5: "h5",
+	TokenH6: "h6",
+	TokenTableStart: "table",
+	TokenTableHeaderStart: "thead",
+	TokenTableCenterAlign: "th",
+	TokenTableRow: "tr",
+	TokenTableCol: "td",
 }
 
-func getClosedTag(t *Token) string {
+func getOpenedTag(d []byte, t *Token) (int, string) {
 	switch t.Type {
-	case TokenH1:
-		return "</h1>\n"
-	case TokenH2:
-		return "</h2>\n"
-	case TokenH3:
-		return "</h3>\n"
-	case TokenAsterisk:
-		return "</i>"
-	case TokenBacktick:
-		return "</code>"
+	case TokenPlainText:
+		s := string(d[t.Start:t.End])
+		return len(s), s
+	default:
+		var tagString string = tagNames[t.Type]
+		if len(tagString) > 0 {
+			return len(tagString)+2, ("<" + tagString + ">")
+		}
 	}
-	return ""
+	return 0, ""
+}
+
+func getClosedTag(t *Token) (int, string) {
+	var tagString string = tagNames[t.Type]
+	if len(tagString) > 0 {
+		return len(tagString)+3, "</" + tagString + ">"
+	}
+	return 0, ""
 }
