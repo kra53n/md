@@ -64,7 +64,7 @@ func Lex(d []byte) []Token {
 	var isTable bool
 	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
 		tokens, isTable = l.table(tokens)
-		if isTable {
+		if isTable && l.tableStartsWithPipe() {
 			continue
 		}
 		t = l.single()
@@ -94,6 +94,7 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	tokens = append(tokens, Token{Type: TokenTableStart})
 	{
 		var headerPipes, i, tableDataPipes int
+		i = start
 		headerPipes, _ = l.tableGetPipesNum(start)
 		tokens = append(tokens, Token{Type: TokenTableHeaderStart})
 		{
@@ -154,12 +155,12 @@ func (l *Lexer) single() Token {
 
 func (l *Lexer) lineBeginning() int {
 	i := l.Pos
-	for i != 0 && l.Data[i] != '\n' {
+	for i != 0 {
+		if l.Data[i] == '\n' {
+			i++
+			break
+		}
 		i--
-	}
-	i--
-	if i < 1 {
-		i = 0
 	}
 	return i
 }
@@ -236,6 +237,10 @@ func (l *Lexer) isTable(start int) bool {
 	return l.isTableAlignsCorrect(i)
 }
 
+func (l *Lexer) tableStartsWithPipe() bool {
+	return l.Data[l.Pos] == '|' && !l.tableIgnorePipe(l.Pos)
+}
+
 func (l *Lexer) tableGetPipesNum(start int) (int, int) {
 	var i, pipes int
 	i = start
@@ -294,6 +299,7 @@ func (l *Lexer) tableAppendHeaders(tokens []Token, pipes int, pos int) []Token {
 		iAligns = l.tableNxtPipe(iAligns) - 1
 
 		startHeader = l.tableLTrim(startHeader)
+		fmt.Println("nnnn", startHeader)
 		iHeaders = l.tableRTrim(iHeaders)
 
 		tokens = append(tokens, Token{
@@ -325,9 +331,10 @@ func (l *Lexer) tableNxtPipe(pos int) int {
 }
 
 func (l *Lexer) tableLTrim(beg int) int {
-	if l.tableIgnorePipe(beg) {
+	if l.Data[beg] == '|' && l.tableIgnorePipe(beg) {
 		beg++
 	}
+	fmt.Println("wassup", beg)
 	beg = l.lTrim(beg)
 	return beg
 }
@@ -749,7 +756,7 @@ func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
 				count = 2
 				return i+1, count
 			}
-		} else if count == 1 && (tokens[i].Type == TokenSpace || tokens[i].Type == TokenNewL) {
+		} else if count == 1 {
 			// NOTE(kra53n): may be have some problems due having here
 			// the TokenNewL
 			return i, count
