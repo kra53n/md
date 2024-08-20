@@ -38,6 +38,8 @@ var tagNames map[TokenType]string = map[TokenType]string{
 	TokenH4: "h4",
 	TokenH5: "h5",
 	TokenH6: "h6",
+	TokenBoldStart: "strong",
+	TokenItalicStart: "em",
 	TokenTableStart: "table",
 	TokenTableHeaderStart: "thead",
 	TokenTableCenterAlign: "th",
@@ -50,6 +52,12 @@ func getOpenedTag(d []byte, t *Token) (int, string) {
 	case TokenPlainText:
 		s := string(d[t.Start:t.End])
 		return len(s), s
+	case TokenUnderscore,
+		TokenAsterisk,
+		TokenBacktick:
+		return 1, string(d[t.Start:t.Start+1])
+	case TokenSpace:
+		return 1, " "
 	default:
 		var tagString string = tagNames[t.Type]
 		if len(tagString) > 0 {

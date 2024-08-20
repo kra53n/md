@@ -72,40 +72,34 @@ func Parse(d []byte, tokens []Token) *Node {
 			root.addChd(&Node{T: tokens[i]})
 			cur = root.LstChd
 
-		// case TokenBacktick:
-		// 	if cur.T.Type == TokenBacktick {
-		// 		cur = cur.Prt
-		// 	} else {
-		// 		cur.addChd(&Node{T: tokens[i]})
-		// 		cur = cur.LstChd
-		// 	}
-
-		// case TokenAsterisk:
-		// 	if cur.T.Type == TokenAsterisk {
-		// 		cur = cur.Prt
-		// 	} else {
-		// 		cur.addChd(&Node{T: tokens[i]})
-		// 		cur = cur.LstChd
-		// 	}
-
 		case TokenNewL:
-			tmp := cur
-			for ; tmp != nil; tmp = tmp.Prt {
-				switch tmp.T.Type {
+			for node := cur; node != nil; node = node.Prt {
+				switch node.T.Type {
 				case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
 					cur = root
 				}
 			}
 			if tokens[i+1].Type == TokenNewL {
 				cur = root
+			} else {
+				cur.addChd(&Node{T: Token{Type: TokenSpace}})
 			}
 
-		case TokenPlainText:
+		case TokenPlainText,
+			TokenSpace,
+			TokenUnderscore,
+			TokenAsterisk,
+			TokenBacktick:
 			cur.addChd(&Node{T: tokens[i]})
 
-		// case TokenTableStart:
-		// 	cur.addChd(&Node{T: tokens[i]})
-		// 	cur = cur.LstChd
+		case TokenBoldStart,
+			TokenItalicStart:
+			cur.addChd(&Node{T: tokens[i]})
+			cur = cur.LstChd
+		case TokenBoldEnd,
+			TokenItalicEnd:
+			cur = cur.Prt
+
 		case TokenTableStart, TokenTableHeaderStart, TokenTableBodyStart:
 			cur.addChd(&Node{T: tokens[i]})
 			cur = cur.LstChd
@@ -127,7 +121,6 @@ func Parse(d []byte, tokens []Token) *Node {
 			cur.addChd(&Node{T: tokens[i]})
 			cur = cur.LstChd
 		case TokenTableRow:
-			fmt.Println(cur.T.Type, cur.Prt.T.Type)
 			switch cur.T.Type {
 			case TokenTableRow:
 				cur = cur.Prt

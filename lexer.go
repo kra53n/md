@@ -707,7 +707,6 @@ Loop:
 			return tokens
 		}
 	}
-	i++
 	i, countEnd = matchBoldOrItalicEnd(tokens, i, t)
 	if countEnd == 0 {
 		return tokens
@@ -742,14 +741,18 @@ func matchBoldOrItalicBeg(tokens []Token, pos int, t TokenType) (int, int) {
 
 func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
 	i := pos
-	count := 1
+	count := 0
 	for ; i < len(tokens); i++ {
 		if tokens[i].Type == t {
 			count++
-			if count > 2 {
+			if count >= 2 {
 				count = 2
-				break
+				return i+1, count
 			}
+		} else if count == 1 && (tokens[i].Type == TokenSpace || tokens[i].Type == TokenNewL) {
+			// NOTE(kra53n): may be have some problems due having here
+			// the TokenNewL
+			return i, count
 		} else if tokens[i].Type == TokenAsterisk || tokens[i].Type == TokenUnderscore {
 			break
 		} else if tokens[i].Type == TokenNewL {
