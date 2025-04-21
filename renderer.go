@@ -32,19 +32,19 @@ func recursiveTraversal(res *string, d []byte, n *Node, ptr *[]Token) {
 }
 
 var tagNames map[TokenType]string = map[TokenType]string{
-	TokenH1: "h1",
-	TokenH2: "h2",
-	TokenH3: "h3",
-	TokenH4: "h4",
-	TokenH5: "h5",
-	TokenH6: "h6",
-	TokenBoldStart: "strong",
-	TokenItalicStart: "em",
-	TokenTableStart: "table",
+	TokenH1:               "h1",
+	TokenH2:               "h2",
+	TokenH3:               "h3",
+	TokenH4:               "h4",
+	TokenH5:               "h5",
+	TokenH6:               "h6",
+	TokenBoldStart:        "strong",
+	TokenItalicStart:      "em",
+	TokenTableStart:       "table",
 	TokenTableHeaderStart: "thead",
 	TokenTableCenterAlign: "th",
-	TokenTableRow: "tr",
-	TokenTableCol: "td",
+	TokenTableRow:         "tr",
+	TokenTableCol:         "td",
 }
 
 func getOpenedTag(d []byte, t *Token) (int, string) {
@@ -55,13 +55,13 @@ func getOpenedTag(d []byte, t *Token) (int, string) {
 	case TokenUnderscore,
 		TokenAsterisk,
 		TokenBacktick:
-		return 1, string(d[t.Start:t.Start+1])
+		return 1, string(d[t.Start : t.Start+1])
 	case TokenSpace:
 		return 1, " "
 	default:
 		var tagString string = tagNames[t.Type]
 		if len(tagString) > 0 {
-			return len(tagString)+2, ("<" + tagString + ">")
+			return len(tagString) + 2, ("<" + tagString + ">")
 		}
 	}
 	return 0, ""
@@ -70,7 +70,7 @@ func getOpenedTag(d []byte, t *Token) (int, string) {
 func getClosedTag(t *Token) (int, string) {
 	var tagString string = tagNames[t.Type]
 	if len(tagString) > 0 {
-		return len(tagString)+3, "</" + tagString + ">"
+		return len(tagString) + 3, "</" + tagString + ">"
 	}
 	return 0, ""
 }

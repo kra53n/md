@@ -66,6 +66,7 @@ func Parse(d []byte, tokens []Token) *Node {
 	root = new(Node)
 	cur = root
 
+	// TODO(kra53n): for more clarity make separate functions with names
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
 		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
@@ -88,7 +89,6 @@ func Parse(d []byte, tokens []Token) *Node {
 		case TokenPlainText,
 			TokenSpace,
 			TokenUnderscore,
-			TokenAsterisk,
 			TokenBacktick:
 			cur.addChd(&Node{T: tokens[i]})
 
@@ -137,7 +137,7 @@ func Parse(d []byte, tokens []Token) *Node {
 			cur = cur.LstChd
 		case TokenTableEnd:
 			cur = root
-			
+
 		}
 	}
 

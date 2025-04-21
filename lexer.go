@@ -15,6 +15,11 @@ type Token struct {
 
 type TokenType int
 
+// NOTE(kra53n):
+// We can use asterisk sign for bold notation and for unordered lists, so
+// we should do something with it. For example have a function or maybe we
+// already have a solution for that, we must check it.
+
 const (
 	TokenNil TokenType = iota
 	TokenH1
@@ -27,14 +32,17 @@ const (
 	TokenSpace
 	TokenAsterisk
 	TokenBacktick
+	TokenDash
 	TokenQuote
 	TokenUnderscore
 	TokenTilde
 	TokenPlainText
 	TokenLink
 	TokenImg
-	TokenUnorderedList
-	TokenOrderedList
+	TokenUnorderedList1
+	TokenUnorderedList2
+	TokenUnorderedList3
+	TokenOrderedList // TODO make 2 ordered lists: with `.` notation and `)`
 	TokenTableStart
 	TokenTableHeaderStart
 	TokenTableHeaderEnd
@@ -129,7 +137,7 @@ func (l *Lexer) single() Token {
 	case '#':
 		return l.header()
 	case '*':
-		return l.charToken(TokenAsterisk)
+		return l.unorderedList('*')
 	case '`':
 		return l.charToken(TokenBacktick)
 	case '>':
@@ -143,7 +151,7 @@ func (l *Lexer) single() Token {
 	case '[':
 		return l.openBrac()
 	case '-':
-		return l.unorderedList('-')
+		return l.unorderedList('-') // NOTE looks like it should be the dash
 	case '+':
 		return l.unorderedList('+')
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -540,8 +548,20 @@ func (l *Lexer) openBrac() Token {
 }
 
 func (l *Lexer) unorderedList(b byte) Token {
+	// TODO define here what tokenunorderedlist type (1 or 2)
+	var ttype TokenType
+	switch b {
+	case '-':
+		ttype = TokenUnorderedList1
+	case '*':
+		ttype = TokenUnorderedList2
+	case '+':
+		ttype = TokenUnorderedList3
+	default:
+		panic("in markdown there is only 3 notations (`-`, `*`, `+`) for declaring the unordered list")
+	}
 	t := Token{
-		Type:  TokenUnorderedList,
+		Type:  ttype,
 		Start: l.Pos,
 		End:   l.Pos + 1,
 	}
@@ -668,8 +688,8 @@ func delExtraNewLinesAtTheEnd(tokens []Token) []Token {
 
 func shiftTokens(tokens []Token, beg int, end int) []Token {
 	i := beg
-	for i + end - beg < len(tokens) {
-		tokens[i] = tokens[i + end - beg]
+	for i+end-beg < len(tokens) {
+		tokens[i] = tokens[i+end-beg]
 		i++
 	}
 	return tokens[:len(tokens)-(end-beg)]
@@ -677,15 +697,15 @@ func shiftTokens(tokens []Token, beg int, end int) []Token {
 
 func analyzeSpace(tokens []Token, pos int) []Token {
 	cur := tokens[pos]
-	if (cur.End - cur.Start >= 4) && (pos == 0 || tokens[pos-1].Type == TokenNewL) {
+	if (cur.End-cur.Start >= 4) && (pos == 0 || tokens[pos-1].Type == TokenNewL) {
 		i := pos + 1
 		for i < len(tokens) && tokens[i].Type != TokenNewL {
 			i++
 		}
 		tokens[pos] = Token{
-			Type: TokenCodeBlock,
+			Type:  TokenCodeBlock,
 			Start: cur.Start,
-			End: tokens[i].End,
+			End:   tokens[i].End,
 		}
 		tokens = shiftTokens(tokens, pos+1, i+1)
 	}
@@ -696,7 +716,7 @@ func analyzeAsteriskAndUnderscore(tokens []Token, pos int) []Token {
 	var t TokenType = tokens[pos].Type
 	var i, countBeg, countEnd, count int
 
-	i = pos+1
+	i = pos + 1
 	if i >= len(tokens) {
 		return tokens
 	}
@@ -721,7 +741,7 @@ Loop:
 
 	count = min(countBeg, countEnd)
 	tokens = replaceWithEmphasis(tokens, pos, i-countEnd, count)
-	
+
 	return tokens
 }
 
@@ -743,7 +763,7 @@ func matchBoldOrItalicBeg(tokens []Token, pos int, t TokenType) (int, int) {
 	if count > 2 {
 		count = 2
 	}
-	return i, count 
+	return i, count
 }
 
 func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
@@ -754,7 +774,7 @@ func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
 			count++
 			if count >= 2 {
 				count = 2
-				return i+1, count
+				return i + 1, count
 			}
 		} else if count == 1 {
 			// NOTE(kra53n): may be have some problems due having here
@@ -771,10 +791,10 @@ func matchBoldOrItalicEnd(tokens []Token, pos int, t TokenType) (int, int) {
 			continue
 		}
 	}
-	return i, count 
+	return i, count
 }
 
-func replaceWithEmphasis(tokens []Token, beg int, end int,  length int) []Token {
+func replaceWithEmphasis(tokens []Token, beg int, end int, length int) []Token {
 	if end >= len(tokens) {
 		return tokens
 	}
@@ -786,14 +806,14 @@ func replaceWithEmphasis(tokens []Token, beg int, end int,  length int) []Token 
 		tEnd = TokenBoldEnd
 	}
 	tokens[beg] = Token{
-		Type: tStart,
+		Type:  tStart,
 		Start: tokens[beg].Start,
-		End: tokens[beg].Start+length,
+		End:   tokens[beg].Start + length,
 	}
 	tokens[end] = Token{
-		Type: tEnd,
+		Type:  tEnd,
 		Start: tokens[end].Start,
-		End: tokens[end].Start+length,
+		End:   tokens[end].Start + length,
 	}
 	if length == 1 {
 		return tokens
@@ -814,14 +834,14 @@ func analyzeBacktick(tokens []Token, pos int) []Token {
 }
 
 func matchBacktickAsCodeLine(tokens []Token, pos int) []Token {
-	i := pos+1
+	i := pos + 1
 	for ; i < len(tokens); i++ {
 		switch tokens[i].Type {
 		case TokenBacktick:
 			tokens[pos] = Token{
-				Type: TokenCodeLine,
-				Start: tokens[pos].Start+1,
-				End: tokens[i].Start,
+				Type:  TokenCodeLine,
+				Start: tokens[pos].Start + 1,
+				End:   tokens[i].Start,
 			}
 			return shiftTokens(tokens, pos+1, i+1)
 		case TokenNewL:
@@ -845,13 +865,13 @@ func matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 		}
 	}
 
-	i = pos+3
+	i = pos + 3
 	for ; i+2 < len(tokens); i++ {
 		if tokens[i].Type == TokenBacktick && tokens[i].Type == tokens[i+1].Type && tokens[i].Type == tokens[i+2].Type {
 			tokens[pos] = Token{
-				Type: TokenCodeBlock,
-				Start: newL.Start+2,
-				End: tokens[i].Start,
+				Type:  TokenCodeBlock,
+				Start: newL.Start + 2,
+				End:   tokens[i].Start,
 			}
 			return shiftTokens(tokens, pos+1, i+1)
 		}
