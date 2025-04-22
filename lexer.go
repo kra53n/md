@@ -19,6 +19,9 @@ type TokenType int
 // We can use asterisk sign for bold notation and for unordered lists, so
 // we should do something with it. For example have a function or maybe we
 // already have a solution for that, we must check it.
+//
+// Solution is that we are tokenize the chars and then process them in next
+// stage (parsing).
 
 const (
 	TokenNil TokenType = iota
