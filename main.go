@@ -14,14 +14,27 @@ func main() {
 		return
 	}
 
+	var (
+		tks []Token
+		ast *Node
+		res *string = new(string)
+	)
+
+	defer debugInfo(data, res)()
+
+	tks = Lex(data)
+	ast = Parse(data, tks)
+	*res = Render(data, ast)
+
+	os.WriteFile("rendered.html", []byte(*res), 0666)
+}
+
+func debugInfo(data []byte, res *string) func() {
 	for _, t := range Lex(data) {
 		t.Print(data)
 	}
-	// Parse(data, Lex(data))
-	// Render(data, Parse(data, Lex(data)))
-
-	res := Render(data, Parse(data, Lex(data)))
-	fmt.Println("Render result:")
-	fmt.Println(res)
-	os.WriteFile("rendered.html", []byte(res), 0666)
+	return func() {
+		fmt.Println("Render result:")
+		fmt.Println(*res)
+	}
 }
