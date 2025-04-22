@@ -36,13 +36,15 @@ const (
 	TokenAsterisk
 	TokenBacktick
 	TokenDash
+	TokenPlus
 	TokenQuote
 	TokenUnderscore
 	TokenTilde
 	TokenPlainText
 	TokenLink
 	TokenImg
-	TokenUnorderedList1
+	TokenUnorderedList
+	TokenUnorderedList1 // TODO rename it to TokenUnorderedListElemX where X - digits
 	TokenUnorderedList2
 	TokenUnorderedList3
 	TokenOrderedList // TODO make 2 ordered lists: with `.` notation and `)`
@@ -140,7 +142,7 @@ func (l *Lexer) single() Token {
 	case '#':
 		return l.header()
 	case '*':
-		return l.unorderedList('*')
+		return l.charToken(TokenAsterisk)
 	case '`':
 		return l.charToken(TokenBacktick)
 	case '>':
@@ -154,9 +156,9 @@ func (l *Lexer) single() Token {
 	case '[':
 		return l.openBrac()
 	case '-':
-		return l.unorderedList('-') // NOTE looks like it should be the dash
+		return l.charToken(TokenDash)
 	case '+':
-		return l.unorderedList('+')
+		return l.charToken(TokenPlus)
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return l.digit()
 	default:
@@ -550,40 +552,40 @@ func (l *Lexer) openBrac() Token {
 	return l.charToken(TokenPlainText)
 }
 
-func (l *Lexer) unorderedList(b byte) Token {
-	// TODO define here what tokenunorderedlist type (1 or 2)
-	var ttype TokenType
-	switch b {
-	case '-':
-		ttype = TokenUnorderedList1
-	case '*':
-		ttype = TokenUnorderedList2
-	case '+':
-		ttype = TokenUnorderedList3
-	default:
-		panic("in markdown there is only 3 notations (`-`, `*`, `+`) for declaring the unordered list")
-	}
-	t := Token{
-		Type:  ttype,
-		Start: l.Pos,
-		End:   l.Pos + 1,
-	}
-	if l.Pos == 0 {
-		return t
-	}
-	i := l.Pos - 1
-	for i > 0 && l.Data[i] == ' ' {
-		i--
-	}
-	if i == l.Pos-1 {
-		i++
-	}
-	if l.Data[i] == b {
-		return t
-	}
-	t.Type = TokenPlainText
-	return t
-}
+// func (l *Lexer) unorderedList(b byte) Token {
+// 	// TODO define here what tokenunorderedlist type (1 or 2)
+// 	var ttype TokenType
+// 	switch b {
+// 	case '-':
+// 		ttype = TokenUnorderedList1
+// 	case '*':
+// 		ttype = TokenUnorderedList2
+// 	case '+':
+// 		ttype = TokenUnorderedList3
+// 	default:
+// 		panic("in markdown there is only 3 notations (`-`, `*`, `+`) for declaring the unordered list")
+// 	}
+// 	t := Token{
+// 		Type:  ttype,
+// 		Start: l.Pos,
+// 		End:   l.Pos + 1,
+// 	}
+// 	if l.Pos == 0 {
+// 		return t
+// 	}
+// 	i := l.Pos - 1
+// 	for i > 0 && l.Data[i] == ' ' {
+// 		i--
+// 	}
+// 	if i == l.Pos-1 {
+// 		i++
+// 	}
+// 	if l.Data[i] == b {
+// 		return t
+// 	}
+// 	t.Type = TokenPlainText
+// 	return t
+// }
 
 func (l *Lexer) digit() Token {
 	t := Token{
@@ -672,7 +674,9 @@ func analyze(d []byte, tokens []Token) []Token {
 		// TODO(kra53n): look at the spaces in TokenUnorderedList, TokenOrderedList
 		case TokenSpace:
 			tokens = analyzeSpace(tokens, i)
-		case TokenAsterisk, TokenUnderscore:
+		case TokenAsterisk, TokenDash, TokenPlus:
+			tokens = analyzeOnUnorderedList(tokens, i)
+		case TokenUnderscore:
 			tokens = analyzeAsteriskAndUnderscore(tokens, i)
 		case TokenBacktick:
 			tokens = analyzeBacktick(tokens, i)
@@ -713,6 +717,32 @@ func analyzeSpace(tokens []Token, pos int) []Token {
 		tokens = shiftTokens(tokens, pos+1, i+1)
 	}
 	return tokens
+}
+
+func analyzeOnUnorderedList(tokens []Token, pos int) []Token {
+	t := &tokens[pos]
+	pT := prvToken(tokens, pos)
+	ppT := prvToken(tokens, pos-1)
+	// ppT vals: TokenNil, TokenNewL, SomeOtherToken
+	//  pT vals: TokenNil, TokenSpace, TokenNewL, SomeOtherToken
+	if pT.Type == TokenNewL || pT.Type == TokenSpace && ppT.Type == TokenNewL || pT.Type == TokenNil {
+		switch t.Type {
+		case TokenAsterisk:
+			t.Type = TokenUnorderedList1
+		case TokenDash:
+			t.Type = TokenUnorderedList2
+		case TokenPlus:
+			t.Type = TokenUnorderedList3
+		}
+	}
+	return tokens
+}
+
+func prvToken(tokens []Token, pos int) Token {
+	if pos <= 0 {
+		return Token{Type: TokenNil}
+	}
+	return tokens[pos-1]
 }
 
 func analyzeAsteriskAndUnderscore(tokens []Token, pos int) []Token {

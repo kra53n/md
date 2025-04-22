@@ -66,10 +66,10 @@ func Parse(d []byte, tokens []Token) *Node {
 	root = new(Node)
 	cur = root
 
-	// TODO(kra53n): for more clarity make separate functions with names
+	// NOTE(kra53n): for more clarity make separate functions with names
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
-		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
+		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6, TokenUnorderedList1, TokenUnorderedList2, TokenUnorderedList3:
 			root.addChd(&Node{T: tokens[i]})
 			cur = root.LstChd
 
@@ -141,7 +141,59 @@ func Parse(d []byte, tokens []Token) *Node {
 		}
 	}
 
+	println()
+	println("Parse tree before processing:")
 	printRoot(root, 2)
+	println()
+
+	root = processTree(root)
+
+	println()
+	println("Parse tree after processing:")
+	printRoot(root, 2)
+	println()
+
+	return root
+}
+
+func processTree(root *Node) *Node {
+	var cur *Node
+
+	cur = root.FstChd
+	if cur == nil {
+		return root
+	}
+
+	for cur != nil {
+		switch cur.T.Type {
+		case TokenUnorderedList1, TokenUnorderedList2, TokenUnorderedList3:
+			ulNode := &Node{
+				T:      Token{Type: TokenUnorderedList},
+				Prt:    cur.Prt,
+				FstChd: cur,
+			}
+			if cur.Prv != nil {
+				cur.Prv.Nxt = ulNode
+			} else {
+				cur.Prt.FstChd = ulNode
+			}
+			end := cur
+			for end.Nxt != nil && end.Nxt.T.Type == cur.T.Type {
+				end.Prt = ulNode
+				end = end.Nxt
+			}
+			ulNode.Nxt = end.Nxt
+			end.Nxt = nil
+			ulNode.LstChd = end
+			if ulNode.Nxt == nil {
+				return root
+			}
+			cur = ulNode.Nxt
+			cur.Prv = ulNode
+		default:
+			cur = cur.Nxt
+		}
+	}
 
 	return root
 }
