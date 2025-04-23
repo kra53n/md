@@ -15,14 +15,6 @@ type Token struct {
 
 type TokenType int
 
-// NOTE(kra53n):
-// We can use asterisk sign for bold notation and for unordered lists, so
-// we should do something with it. For example have a function or maybe we
-// already have a solution for that, we must check it.
-//
-// Solution is that we are tokenize the chars and then process them in next
-// stage (parsing).
-
 const (
 	TokenNil TokenType = iota
 	TokenH1
@@ -44,10 +36,12 @@ const (
 	TokenLink
 	TokenImg
 	TokenUnorderedList
-	TokenUnorderedList1 // TODO rename it to TokenUnorderedListElemX where X - digits
-	TokenUnorderedList2
-	TokenUnorderedList3
-	TokenOrderedList // TODO make 2 ordered lists: with `.` notation and `)`
+	TokenUnorderedListElem1
+	TokenUnorderedListElem2
+	TokenUnorderedListElem3
+	TokenOrderedList
+	TokenOrderedListElem1
+	TokenOrderedListElem2
 	TokenTableStart
 	TokenTableHeaderStart
 	TokenTableHeaderEnd
@@ -552,44 +546,8 @@ func (l *Lexer) openBrac() Token {
 	return l.charToken(TokenPlainText)
 }
 
-// func (l *Lexer) unorderedList(b byte) Token {
-// 	// TODO define here what tokenunorderedlist type (1 or 2)
-// 	var ttype TokenType
-// 	switch b {
-// 	case '-':
-// 		ttype = TokenUnorderedList1
-// 	case '*':
-// 		ttype = TokenUnorderedList2
-// 	case '+':
-// 		ttype = TokenUnorderedList3
-// 	default:
-// 		panic("in markdown there is only 3 notations (`-`, `*`, `+`) for declaring the unordered list")
-// 	}
-// 	t := Token{
-// 		Type:  ttype,
-// 		Start: l.Pos,
-// 		End:   l.Pos + 1,
-// 	}
-// 	if l.Pos == 0 {
-// 		return t
-// 	}
-// 	i := l.Pos - 1
-// 	for i > 0 && l.Data[i] == ' ' {
-// 		i--
-// 	}
-// 	if i == l.Pos-1 {
-// 		i++
-// 	}
-// 	if l.Data[i] == b {
-// 		return t
-// 	}
-// 	t.Type = TokenPlainText
-// 	return t
-// }
-
 func (l *Lexer) digit() Token {
 	t := Token{
-		Type:  TokenOrderedList,
 		Start: l.Pos,
 		End:   l.Pos + 1,
 	}
@@ -608,14 +566,13 @@ func (l *Lexer) digit() Token {
 			continue
 		}
 		switch c {
-		// TODO(kra53n): check one different cases
-		// case ' ', '\r', 0:
-		// 	t.Type = TokenPlainText
-		// 	t.Start = l.Pos
-		// 	t.End = i
-		// 	l.Pos = i - 1
-		// 	return t
 		case '.', ')':
+			switch c {
+			case '.':
+				t.Type = TokenOrderedListElem1
+			case ')':
+				t.Type = TokenOrderedListElem2
+			}
 			t.Start = l.Pos
 			t.End = i + 1
 			l.Pos = i
@@ -728,11 +685,11 @@ func analyzeOnUnorderedList(tokens []Token, pos int) []Token {
 	if pT.Type == TokenNewL || pT.Type == TokenSpace && ppT.Type == TokenNewL || pT.Type == TokenNil {
 		switch t.Type {
 		case TokenAsterisk:
-			t.Type = TokenUnorderedList1
+			t.Type = TokenUnorderedListElem1
 		case TokenDash:
-			t.Type = TokenUnorderedList2
+			t.Type = TokenUnorderedListElem2
 		case TokenPlus:
-			t.Type = TokenUnorderedList3
+			t.Type = TokenUnorderedListElem3
 		}
 	}
 	return tokens

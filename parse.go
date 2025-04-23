@@ -69,7 +69,17 @@ func Parse(d []byte, tokens []Token) *Node {
 	// NOTE(kra53n): for more clarity make separate functions with names
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
-		case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6, TokenUnorderedList1, TokenUnorderedList2, TokenUnorderedList3:
+		case TokenH1,
+			TokenH2,
+			TokenH3,
+			TokenH4,
+			TokenH5,
+			TokenH6,
+			TokenUnorderedListElem1,
+			TokenUnorderedListElem2,
+			TokenUnorderedListElem3,
+			TokenOrderedListElem1,
+			TokenOrderedListElem2:
 			root.addChd(&Node{T: tokens[i]})
 			cur = root.LstChd
 
@@ -166,9 +176,24 @@ func processTree(root *Node) *Node {
 
 	for cur != nil {
 		switch cur.T.Type {
-		case TokenUnorderedList1, TokenUnorderedList2, TokenUnorderedList3:
+		case TokenUnorderedListElem1,
+			TokenUnorderedListElem2,
+			TokenUnorderedListElem3,
+			TokenOrderedListElem1,
+			TokenOrderedListElem2:
+
+			var ulNodeTokenType TokenType
+			switch cur.T.Type {
+			case TokenUnorderedListElem1,
+				TokenUnorderedListElem2,
+				TokenUnorderedListElem3:
+				ulNodeTokenType = TokenUnorderedList
+			case TokenOrderedListElem1,
+				TokenOrderedListElem2:
+				ulNodeTokenType = TokenOrderedList
+			}
 			ulNode := &Node{
-				T:      Token{Type: TokenUnorderedList},
+				T:      Token{Type: ulNodeTokenType},
 				Prt:    cur.Prt,
 				FstChd: cur,
 			}
