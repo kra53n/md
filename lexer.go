@@ -866,7 +866,7 @@ func (l *Lexer) matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 				Start: l.nxtChrFrom('`', newL.Start+2) + 3,
 				End:   tokens[i].Start,
 			}
-			return shiftTokens(tokens, pos+1, i+1)
+			return shiftTokens(tokens, pos+1, i+3)
 		}
 	}
 	return tokens
