@@ -99,7 +99,8 @@ func Parse(d []byte, tokens []Token) *Node {
 		case TokenPlainText,
 			TokenSpace,
 			TokenUnderscore,
-			TokenBacktick:
+			TokenBacktick,
+			TokenCodeBlock:
 			cur.addChd(&Node{T: tokens[i]})
 
 		case TokenBoldStart,

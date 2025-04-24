@@ -45,6 +45,7 @@ var tagNames map[TokenType]string = map[TokenType]string{
 	TokenOrderedList:        "ol",
 	TokenOrderedListElem1:   "li",
 	TokenOrderedListElem2:   "li",
+	TokenCodeBlock:          "pre",
 	TokenBoldStart:          "strong",
 	TokenItalicStart:        "em",
 	TokenTableStart:         "table",
@@ -68,7 +69,14 @@ func getOpenedTag(d []byte, t *Token) (int, string) {
 	default:
 		var tagString string = tagNames[t.Type]
 		if len(tagString) > 0 {
-			return len(tagString) + 2, ("<" + tagString + ">")
+			openedTag := "<" + tagString + ">"
+			l := len(tagString) + 2
+			switch t.Type {
+			case TokenCodeBlock:
+				openedTag += string(d[t.Start:t.End])
+				l += t.End - t.Start
+			}
+			return l, openedTag
 		}
 	}
 	return 0, ""

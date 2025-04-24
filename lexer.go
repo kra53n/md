@@ -88,7 +88,7 @@ func Lex(d []byte) []Token {
 		}
 		tokens = append(tokens, t)
 	}
-	return analyze(d, tokens)
+	return l.analyze(d, tokens)
 }
 
 func (l *Lexer) table(tokens []Token) ([]Token, bool) {
@@ -624,7 +624,7 @@ func hasExcessSapce(tokens []Token, cur *Token) bool {
 	return tokens[len(tokens)-1].Type == TokenSpace && cur.Type == TokenNewL
 }
 
-func analyze(d []byte, tokens []Token) []Token {
+func (l *Lexer) analyze(d []byte, tokens []Token) []Token {
 	tokens = delExtraNewLinesAtTheEnd(tokens)
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
@@ -636,7 +636,7 @@ func analyze(d []byte, tokens []Token) []Token {
 		case TokenUnderscore:
 			tokens = analyzeAsteriskAndUnderscore(tokens, i)
 		case TokenBacktick:
-			tokens = analyzeBacktick(tokens, i)
+			tokens = l.analyzeBacktick(tokens, i)
 		}
 	}
 	return tokens
@@ -813,12 +813,15 @@ func replaceWithEmphasis(tokens []Token, beg int, end int, length int) []Token {
 	return tokens
 }
 
-func analyzeBacktick(tokens []Token, pos int) []Token {
+func (l *Lexer) analyzeBacktick(tokens []Token, pos int) []Token {
+	if pos+1 == len(tokens) {
+		return tokens
+	}
 	if tokens[pos+1].Type != TokenBacktick && tokens[pos+1].Type != TokenNewL {
 		return matchBacktickAsCodeLine(tokens, pos)
 	}
 	if pos+2 < len(tokens) && tokens[pos+1].Type == TokenBacktick && tokens[pos+2].Type == TokenBacktick {
-		return matchBacktickAsCodeBlock(tokens, pos)
+		return l.matchBacktickAsCodeBlock(tokens, pos)
 	}
 	return tokens
 }
@@ -843,7 +846,7 @@ func matchBacktickAsCodeLine(tokens []Token, pos int) []Token {
 	return tokens
 }
 
-func matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
+func (l *Lexer) matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 	var newL Token = tokens[pos]
 	newL.Start += 1
 	var i int
@@ -860,11 +863,23 @@ func matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 		if tokens[i].Type == TokenBacktick && tokens[i].Type == tokens[i+1].Type && tokens[i].Type == tokens[i+2].Type {
 			tokens[pos] = Token{
 				Type:  TokenCodeBlock,
-				Start: newL.Start + 2,
+				Start: l.nxtChrFrom('`', newL.Start+2) + 3,
 				End:   tokens[i].Start,
 			}
-			return shiftTokens(tokens, pos+1, i+1)
+			return shiftTokens(tokens, pos+1, i+3)
 		}
 	}
 	return tokens
+}
+
+func (l *Lexer) nxtChrFrom(c byte, from int) int {
+	cur := from
+	for !l.eof(cur) && l.Data[cur] != c {
+		cur++
+	}
+	return cur
+}
+
+func (l *Lexer) nxtChr(c byte) int {
+	return l.nxtChrFrom(c, l.Pos)
 }
