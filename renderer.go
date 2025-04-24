@@ -73,7 +73,7 @@ func getOpenedTag(d []byte, t *Token) (int, string) {
 			l := len(tagString) + 2
 			switch t.Type {
 			case TokenCodeBlock:
-				openedTag += string(d[t.Start : t.End])
+				openedTag += string(d[t.Start:t.End])
 				l += t.End - t.Start
 			}
 			return l, openedTag
