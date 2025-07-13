@@ -7,6 +7,9 @@ import (
 )
 
 func main() {
+	runSpecTests()
+	return
+
 	filename := "README.md"
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
