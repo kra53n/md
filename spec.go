@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 )
 
 type SpecTest struct {
@@ -15,10 +16,10 @@ type SpecTest struct {
 }
 
 type SpecTestInfo struct {
-	name   string
-	path   string
-	format SpecTestFormat
-	parse  func(unmarshaled interface{}) []SpecTest
+	name      string
+	path      string
+	format    SpecTestFormat
+	specTests func(s *SpecTestInfo, unmarshaled interface{}) ([]SpecTest, error)
 }
 
 type SpecTestFormat int
@@ -32,24 +33,22 @@ var specTestInfos []SpecTestInfo = []SpecTestInfo{
 		name:   "commonmmark",
 		path:   "spec/commonmark/commonmark.0.31.2.json",
 		format: Json,
-		parse: func(unmarshaled interface{}) []SpecTest {
+		specTests: func(s *SpecTestInfo, unmarshaled interface{}) ([]SpecTest, error) {
 			switch tests := unmarshaled.(type) {
 			case []interface{}:
 				specTests := make([]SpecTest, 0, len(tests))
 				for _, test := range tests {
 					if t, ok := test.(map[string]interface{}); ok {
 						specTests = append(specTests, SpecTest{
-							md: t["markdown"].(string),
-							html: t["html"].(string),
+							md:      t["markdown"].(string),
+							html:    t["html"].(string),
 							section: t["section"].(string),
 						})
 					}
 				}
-				return specTests
-			default:
-				fmt.Println("watafak")
+				return specTests, nil
 			}
-			return nil
+			return nil, errors.New(fmt.Sprint("extractFields ", s.path, ": due to some reasons"))
 		},
 	},
 	SpecTestInfo{
@@ -60,32 +59,37 @@ var specTestInfos []SpecTestInfo = []SpecTestInfo{
 }
 
 func runSpecTests() {
-	for _, spec := range specTestInfos {
-		spec.run()
+	for _, s := range specTestInfos {
+		s.run()
 	}
 }
 
 func (s *SpecTestInfo) run() {
-	specTests, err := s.read()
+	data, err := ioutil.ReadFile(s.path)
 	if err != nil {
-		fmt.Println("[ERROR] ", err)
-		return
+		printTestErr(err)
 	}
+
+	unmarshaled, err := s.unmarshal(data)
+	if err != nil {
+		printTestErr(err)
+	}
+
+	if s.specTests == nil {
+		printTestErr(errors.New(fmt.Sprint("run ", s.path, ": parse function was not attached in Spec struct value for specTests slice")))
+	}
+
+	specTests, err := s.specTests(s, unmarshaled)
 	for _, specTest := range specTests {
 		err := specTest.test(s)
 		if err != nil {
-			fmt.Println("[ERROR] ", err)
-			return
+			printTestErr(err)
 		}
 	}
 }
 
-func (s *SpecTestInfo) read() ([]SpecTest, error) {
-	data, err := ioutil.ReadFile(s.path)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *SpecTestInfo) unmarshal(data []byte) (interface{}, error) {
+	var err error
 	var unmarshaled interface{}
 
 	switch s.format {
@@ -95,14 +99,15 @@ func (s *SpecTestInfo) read() ([]SpecTest, error) {
 			return nil, err
 		}
 	default:
-		return nil, errors.New(fmt.Sprint("parse ", s.path, ": SpecTestFormat(", s.format, ") was not implemented"))
+		return nil, errors.New(fmt.Sprint("unmarshal ", s.path, ": SpecTestFormat(", s.format, ") was not implemented"))
 	}
 
-	if s.parse == nil {
-		return nil, errors.New(fmt.Sprint("parse ", s.path, ": parse function was not attached in Spec struct value for specTests slice"))
-	}
+	return unmarshaled, nil
+}
 
-	return s.parse(unmarshaled), nil
+func printTestErr(e error) {
+	fmt.Println("[ERROR] ", e)
+	os.Exit(69)
 }
 
 func (st *SpecTest) test(i *SpecTestInfo) error {
