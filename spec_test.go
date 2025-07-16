@@ -9,37 +9,39 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"testing"
 )
 
-type SpecTest struct {
+type MDTest struct {
 	md, html, section string
 }
 
-type SpecTestInfo struct {
+type TestSuite struct {
 	name      string
 	path      string
-	format    SpecTestFormat
-	specTests func(s *SpecTestInfo, unmarshaled interface{}) ([]SpecTest, error)
+	format    FileFormat
+	specTests func(s *TestSuite, unmarshaled interface{}) ([]MDTest, error)
+	tests     []MDTest
 }
 
-type SpecTestFormat int
+type FileFormat int
 
 const (
-	Json SpecTestFormat = iota
+	Json FileFormat = iota
 )
 
-var specTestInfos []SpecTestInfo = []SpecTestInfo{
-	SpecTestInfo{
+var testSuites []TestSuite = []TestSuite{
+	TestSuite{
 		name:   "commonmmark",
 		path:   "spec/commonmark/commonmark.0.31.2.json",
 		format: Json,
-		specTests: func(s *SpecTestInfo, unmarshaled interface{}) ([]SpecTest, error) {
+		specTests: func(s *TestSuite, unmarshaled interface{}) ([]MDTest, error) {
 			switch tests := unmarshaled.(type) {
 			case []interface{}:
-				specTests := make([]SpecTest, 0, len(tests))
+				specTests := make([]MDTest, 0, len(tests))
 				for _, test := range tests {
 					if t, ok := test.(map[string]interface{}); ok {
-						specTests = append(specTests, SpecTest{
+						specTests = append(specTests, MDTest{
 							md:      t["markdown"].(string),
 							html:    t["html"].(string),
 							section: t["section"].(string),
@@ -51,7 +53,7 @@ var specTestInfos []SpecTestInfo = []SpecTestInfo{
 			return nil, errors.New(fmt.Sprint("extractFields ", s.path, ": due to some reasons"))
 		},
 	},
-	SpecTestInfo{
+	TestSuite{
 		name:   "other md standard",
 		path:   "spec/other/other.0.0.1.json",
 		format: Json,
@@ -59,12 +61,12 @@ var specTestInfos []SpecTestInfo = []SpecTestInfo{
 }
 
 func runSpecTests() {
-	for _, s := range specTestInfos {
+	for _, s := range testSuites {
 		s.run()
 	}
 }
 
-func (s *SpecTestInfo) run() {
+func (s *TestSuite) run() {
 	data, err := ioutil.ReadFile(s.path)
 	if err != nil {
 		printTestErr(err)
@@ -88,7 +90,7 @@ func (s *SpecTestInfo) run() {
 	}
 }
 
-func (s *SpecTestInfo) unmarshal(data []byte) (interface{}, error) {
+func (s *TestSuite) unmarshal(data []byte) (interface{}, error) {
 	var err error
 	var unmarshaled interface{}
 
@@ -110,7 +112,13 @@ func printTestErr(e error) {
 	os.Exit(69)
 }
 
-func (st *SpecTest) test(i *SpecTestInfo) error {
-	fmt.Println(i.name, i.path, st.section)
+func (t *MDTest) test(s *TestSuite) error {
+	fmt.Println(s.name, s.path, t.section)
 	return nil
+}
+
+func TestSpecs(t *testing.T) {
+	for _, testSuite := range testSuites {
+		_ = testSuite
+	}
 }
