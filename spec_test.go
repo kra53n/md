@@ -127,25 +127,33 @@ func renderHTMLFromMD(md string) string {
 
 func TestSpecs(t *testing.T) {
 	for _, testSuite := range testSuites {
-		t.Run(testSuite.name, func(subtest *testing.T) {
-			sections, err := testSuite.MDTests()
-			if err != nil {
-				subtest.Error(err)
-			}
-
-			for _, section := range sections {
-				if section.name != "List items" {
-					continue
-				}
-				subtest.Run(section.name, func(sectionTest *testing.T) {
-					for _, mdTest := range section.tests {
-						src := renderHTMLFromMD(mdTest.md)
-						if src != mdTest.html {
-							sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)
-						}
-					}
-				})
-			}
-		})
+		runTestSuite(t, testSuite)
 	}
+}
+
+func runTestSuite(t *testing.T, testSuite TestSuite) {
+	t.Run(testSuite.name, func(subtest *testing.T) {
+		sections, err := testSuite.MDTests()
+		if err != nil {
+			subtest.Error(err)
+		}
+
+		for _, section := range sections {
+			runTestSection(subtest, section)
+		}
+	})
+}
+
+func runTestSection(t *testing.T, section TestSection) {
+	if section.name != "List items" {
+		return
+	}
+	t.Run(section.name, func(sectionTest *testing.T) {
+		for _, mdTest := range section.tests {
+			src := renderHTMLFromMD(mdTest.md)
+			if src != mdTest.html {
+				sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)
+			}
+		}
+	})
 }
