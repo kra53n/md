@@ -16,18 +16,18 @@ type MDTest struct {
 }
 
 type TestSection struct {
-	tests []MDTest
 	name  string
+	tests []MDTest
 }
 
 type TestSections []TestSection
 
 type TestSuite struct {
-	name      string
-	path      string
-	format    FileFormat
-	specTests func(s *TestSuite, unmarshaled interface{}) (TestSections, error)
-	tests     []MDTest
+	name    string
+	path    string
+	format  FileFormat
+	extract func(s *TestSuite, unmarshaled interface{}) (TestSections, error)
+	tests   []MDTest
 }
 
 type FileFormat int
@@ -41,7 +41,7 @@ var testSuites []TestSuite = []TestSuite{
 		name:   "commonmmark",
 		path:   "spec/commonmark/commonmark.0.31.2.json",
 		format: Json,
-		specTests: func(s *TestSuite, unmarshaled interface{}) (TestSections, error) {
+		extract: func(s *TestSuite, unmarshaled interface{}) (TestSections, error) {
 			switch tests := unmarshaled.(type) {
 			case []interface{}:
 				var testSections TestSections
@@ -94,10 +94,10 @@ func (s *TestSuite) sections() (TestSections, error) {
 		return nil, err
 	}
 
-	if s.specTests == nil {
+	if s.extract == nil {
 		return nil, errors.New(fmt.Sprint("run ", s.path, ": parse function was not attached in Spec struct value for specTests slice"))
 	}
-	return s.specTests(s, unmarshaled)
+	return s.extract(s, unmarshaled)
 }
 
 func (s *TestSuite) unmarshal(data []byte) (interface{}, error) {
