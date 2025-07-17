@@ -83,7 +83,7 @@ func (ts *TestSections) add(name string, test MDTest) {
 	})
 }
 
-func (s *TestSuite) MDTests() (TestSections, error) {
+func (s *TestSuite) sections() (TestSections, error) {
 	data, err := ioutil.ReadFile(s.path)
 	if err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func TestSpecs(t *testing.T) {
 
 func runTestSuite(t *testing.T, testSuite TestSuite) {
 	t.Run(testSuite.name, func(subtest *testing.T) {
-		sections, err := testSuite.MDTests()
+		sections, err := testSuite.sections()
 		if err != nil {
 			subtest.Error(err)
 		}
