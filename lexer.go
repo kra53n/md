@@ -306,7 +306,6 @@ func (l *Lexer) tableAppendHeaders(tokens []Token, pipes int, pos int) []Token {
 		iAligns = l.tableNxtPipe(iAligns) - 1
 
 		startHeader = l.tableLTrim(startHeader)
-		fmt.Println("nnnn", startHeader)
 		iHeaders = l.tableRTrim(iHeaders)
 
 		tokens = append(tokens, Token{
@@ -341,7 +340,6 @@ func (l *Lexer) tableLTrim(beg int) int {
 	if l.Data[beg] == '|' && l.tableIgnorePipe(beg) {
 		beg++
 	}
-	fmt.Println("wassup", beg)
 	beg = l.lTrim(beg)
 	return beg
 }

@@ -7,8 +7,6 @@ import (
 )
 
 func main() {
-	return
-
 	filename := "README.md"
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -22,7 +20,7 @@ func main() {
 		res *string = new(string)
 	)
 
-	defer debugInfo(data, res)()
+	// defer debugInfo(data, res)()
 
 	tks = Lex(data)
 	ast = Parse(data, tks)

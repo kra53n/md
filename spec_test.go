@@ -145,11 +145,13 @@ func runTestSuite(t *testing.T, testSuite TestSuite) {
 }
 
 func runTestSection(t *testing.T, section TestSection) {
-	if section.name != "List items" {
+	switch section.name {
+	case "List items":
 		return
 	}
 	t.Run(section.name, func(sectionTest *testing.T) {
 		for _, mdTest := range section.tests {
+			fmt.Printf("%q\n", mdTest.md)
 			src := renderHTMLFromMD(mdTest.md)
 			if src != mdTest.html {
 				sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)

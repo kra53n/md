@@ -152,17 +152,17 @@ func Parse(d []byte, tokens []Token) *Node {
 		}
 	}
 
-	println()
-	println("Parse tree before processing:")
-	printRoot(root, 2)
-	println()
+	// println()
+	// println("Parse tree before processing:")
+	// printRoot(root, 2)
+	// println()
 
-	root = processTree(root)
+	// root = processTree(root)
 
-	println()
-	println("Parse tree after processing:")
-	printRoot(root, 2)
-	println()
+	// println()
+	// println("Parse tree after processing:")
+	// printRoot(root, 2)
+	// println()
 
 	return root
 }
