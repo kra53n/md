@@ -15,11 +15,18 @@ type MDTest struct {
 	md, html, section string
 }
 
+type TestSection struct {
+	tests []MDTest
+	name  string
+}
+
+type TestSections []TestSection
+
 type TestSuite struct {
 	name      string
 	path      string
 	format    FileFormat
-	specTests func(s *TestSuite, unmarshaled interface{}) ([]MDTest, error)
+	specTests func(s *TestSuite, unmarshaled interface{}) (TestSections, error)
 	tests     []MDTest
 }
 
@@ -34,20 +41,24 @@ var testSuites []TestSuite = []TestSuite{
 		name:   "commonmmark",
 		path:   "spec/commonmark/commonmark.0.31.2.json",
 		format: Json,
-		specTests: func(s *TestSuite, unmarshaled interface{}) ([]MDTest, error) {
+		specTests: func(s *TestSuite, unmarshaled interface{}) (TestSections, error) {
 			switch tests := unmarshaled.(type) {
 			case []interface{}:
-				specTests := make([]MDTest, 0, len(tests))
+				var testSections TestSections
 				for _, test := range tests {
 					if t, ok := test.(map[string]interface{}); ok {
-						specTests = append(specTests, MDTest{
-							md:      t["markdown"].(string),
-							html:    t["html"].(string),
-							section: t["section"].(string),
+						sectionName := t["section"].(string)
+						if sectionName == "" {
+							// TODO(kra53n): put it to TestSections
+							sectionName = "general"
+						}
+						testSections.add(sectionName, MDTest{
+							md:   t["markdown"].(string),
+							html: t["html"].(string),
 						})
 					}
 				}
-				return specTests, nil
+				return testSections, nil
 			}
 			return nil, errors.New(fmt.Sprint("extractFields ", s.path, ": due to some reasons"))
 		},
@@ -59,7 +70,20 @@ var testSuites []TestSuite = []TestSuite{
 	},
 }
 
-func (s *TestSuite) MDTests() ([]MDTest, error) {
+func (ts *TestSections) add(name string, test MDTest) {
+	for i := range *ts {
+		if (*ts)[i].name == name {
+			(*ts)[i].tests = append((*ts)[i].tests, test)
+			return
+		}
+	}
+	*ts = append((*ts), TestSection{
+		name:  name,
+		tests: []MDTest{test},
+	})
+}
+
+func (s *TestSuite) MDTests() (TestSections, error) {
 	data, err := ioutil.ReadFile(s.path)
 	if err != nil {
 		return nil, err
@@ -104,16 +128,23 @@ func renderHTMLFromMD(md string) string {
 func TestSpecs(t *testing.T) {
 	for _, testSuite := range testSuites {
 		t.Run(testSuite.name, func(subtest *testing.T) {
-			mdTests, err := testSuite.MDTests()
+			sections, err := testSuite.MDTests()
 			if err != nil {
 				subtest.Error(err)
 			}
 
-			for _, mdTest := range mdTests {
-				fmt.Printf("drt: %q\n", renderHTMLFromMD(mdTest.md))
-				fmt.Printf("src: %q\n", mdTest.md)
-				fmt.Printf("dst: %q\n", mdTest.html)
-				fmt.Println()
+			for _, section := range sections {
+				if section.name != "List items" {
+					continue
+				}
+				subtest.Run(section.name, func(sectionTest *testing.T) {
+					for _, mdTest := range section.tests {
+						src := renderHTMLFromMD(mdTest.md)
+						if src != mdTest.html {
+							sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)
+						}
+					}
+				})
 			}
 		})
 	}
