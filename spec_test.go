@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"testing"
 )
 
@@ -60,34 +59,21 @@ var testSuites []TestSuite = []TestSuite{
 	},
 }
 
-func runSpecTests() {
-	for _, s := range testSuites {
-		s.run()
-	}
-}
-
-func (s *TestSuite) run() {
+func (s *TestSuite) MDTests() ([]MDTest, error) {
 	data, err := ioutil.ReadFile(s.path)
 	if err != nil {
-		printTestErr(err)
+		return nil, err
 	}
 
 	unmarshaled, err := s.unmarshal(data)
 	if err != nil {
-		printTestErr(err)
+		return nil, err
 	}
 
 	if s.specTests == nil {
-		printTestErr(errors.New(fmt.Sprint("run ", s.path, ": parse function was not attached in Spec struct value for specTests slice")))
+		return nil, errors.New(fmt.Sprint("run ", s.path, ": parse function was not attached in Spec struct value for specTests slice"))
 	}
-
-	specTests, err := s.specTests(s, unmarshaled)
-	for _, specTest := range specTests {
-		err := specTest.test(s)
-		if err != nil {
-			printTestErr(err)
-		}
-	}
+	return s.specTests(s, unmarshaled)
 }
 
 func (s *TestSuite) unmarshal(data []byte) (interface{}, error) {
@@ -107,18 +93,28 @@ func (s *TestSuite) unmarshal(data []byte) (interface{}, error) {
 	return unmarshaled, nil
 }
 
-func printTestErr(e error) {
-	fmt.Println("[ERROR] ", e)
-	os.Exit(69)
-}
-
-func (t *MDTest) test(s *TestSuite) error {
-	fmt.Println(s.name, s.path, t.section)
-	return nil
+func renderHTMLFromMD(md string) string {
+	mdBytes := []byte(md)
+	tks := Lex(mdBytes)
+	ast := Parse(mdBytes, tks)
+	res := Render(mdBytes, ast)
+	return res
 }
 
 func TestSpecs(t *testing.T) {
 	for _, testSuite := range testSuites {
-		_ = testSuite
+		t.Run(testSuite.name, func(subtest *testing.T) {
+			mdTests, err := testSuite.MDTests()
+			if err != nil {
+				subtest.Error(err)
+			}
+
+			for _, mdTest := range mdTests {
+				fmt.Printf("drt: %q\n", renderHTMLFromMD(mdTest.md))
+				fmt.Printf("src: %q\n", mdTest.md)
+				fmt.Printf("dst: %q\n", mdTest.html)
+				fmt.Println()
+			}
+		})
 	}
 }
