@@ -12,7 +12,7 @@ import (
 )
 
 type MDTest struct {
-	md, html, section string
+	md, html string
 }
 
 type TestSection struct {
