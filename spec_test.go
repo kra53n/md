@@ -118,10 +118,10 @@ func (s *TestSuite) unmarshal(data []byte) (interface{}, error) {
 }
 
 func renderHTMLFromMD(md string) string {
-	mdBytes := []byte(md)
-	tks := Lex(mdBytes)
-	ast := Parse(mdBytes, tks)
-	res := Render(mdBytes, ast)
+	runes := []rune(md)
+	tks := Lex(runes)
+	ast := Parse(runes, tks)
+	res := Render(runes, ast)
 	return res
 }
 

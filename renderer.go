@@ -5,7 +5,7 @@ package main
  * 2) using the recursion
  * We must test both variants and choose the best
  */
-func Render(d []byte, root *Node) string {
+func Render(d []rune, root *Node) string {
 	var res *string
 	res = new(string)
 
@@ -13,7 +13,7 @@ func Render(d []byte, root *Node) string {
 	return *res
 }
 
-func recursiveTraversal(res *string, d []byte, n *Node, ptr *[]Token) {
+func recursiveTraversal(res *string, d []rune, n *Node, ptr *[]Token) {
 	if n == nil {
 		return
 	}
@@ -55,7 +55,7 @@ var tagNames map[TokenType]string = map[TokenType]string{
 	TokenTableCol:           "td",
 }
 
-func getOpenedTag(d []byte, t *Token) (int, string) {
+func getOpenedTag(d []rune, t *Token) (int, string) {
 	switch t.Type {
 	case TokenPlainText:
 		s := string(d[t.Start:t.End])

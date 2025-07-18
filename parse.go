@@ -43,7 +43,7 @@ type Node struct {
 // 	Prvs []*Node
 // }
 
-func Parse(d []byte, tokens []Token) *Node {
+func Parse(d []rune, tokens []Token) *Node {
 	/* TODO(kra53n):
 	 * Maybe this stage we can call analysis.
 

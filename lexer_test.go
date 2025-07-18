@@ -95,7 +95,7 @@ func runLexerTestSuite(t *testing.T, testSuite []lexerTestSuite) {
 	for i, testCase := range testSuite {
 		t.Run(fmt.Sprintf("%d", i), func(st *testing.T) {
 			buf = testCase.md
-			tks := Lex([]byte(buf))
+			tks := Lex([]rune(buf))
 			if !tksEqualsByTypes(tks, testCase.expect) {
 				st.Errorf("\n     got: %s\nexpected: %s\n", tks, testCase.expect)
 			}

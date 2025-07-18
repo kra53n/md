@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 type Lexer struct {
-	Data []byte
+	Data []rune
 	Pos  int
 }
 
@@ -62,7 +62,7 @@ const (
 	TokenStrikeThrough
 )
 
-func Lex(d []byte) []Token {
+func Lex(d []rune) []Token {
 	l := Lexer{}
 	l.Data = d
 
@@ -88,7 +88,7 @@ func Lex(d []byte) []Token {
 		}
 		tokens = append(tokens, t)
 	}
-	return l.analyze(d, tokens)
+	return l.analyze(tokens)
 }
 
 func (l *Lexer) table(tokens []Token) ([]Token, bool) {
@@ -225,8 +225,8 @@ func (l *Lexer) skipChar(pos int) bool {
 	return false
 }
 
-func (t *Token) Print(d []byte) {
-	fmt.Printf("Type: %d Val: %s(%d, %d)\n", t.Type, d[t.Start:t.End], t.Start, t.End)
+func (t *Token) Print(d []rune) {
+	fmt.Printf("Type: %d Val: %s(%d, %d)\n", t.Type, string(d[t.Start:t.End]), t.Start, t.End)
 }
 
 func (l *Lexer) isTable(start int) bool {
@@ -622,7 +622,7 @@ func hasExcessSapce(tokens []Token, cur *Token) bool {
 	return tokens[len(tokens)-1].Type == TokenSpace && cur.Type == TokenNewL
 }
 
-func (l *Lexer) analyze(d []byte, tokens []Token) []Token {
+func (l *Lexer) analyze(tokens []Token) []Token {
 	tokens = delExtraNewLinesAtTheEnd(tokens)
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i].Type {
@@ -660,8 +660,8 @@ func shiftTokens(tokens []Token, beg int, end int) []Token {
 func analyzeSpace(tokens []Token, pos int) []Token {
 	cur := tokens[pos]
 	if (cur.End-cur.Start >= 4) && (pos == 0 || tokens[pos-1].Type == TokenNewL) {
-		i := pos + 1
-		for i < len(tokens) && tokens[i].Type != TokenNewL {
+		i := pos
+		for i+1 < len(tokens) && tokens[i+1].Type != TokenNewL {
 			i++
 		}
 		tokens[pos] = Token{
@@ -870,7 +870,7 @@ func (l *Lexer) matchBacktickAsCodeBlock(tokens []Token, pos int) []Token {
 	return tokens
 }
 
-func (l *Lexer) nxtChrFrom(c byte, from int) int {
+func (l *Lexer) nxtChrFrom(c rune, from int) int {
 	cur := from
 	for !l.eof(cur) && l.Data[cur] != c {
 		cur++
@@ -878,6 +878,6 @@ func (l *Lexer) nxtChrFrom(c byte, from int) int {
 	return cur
 }
 
-func (l *Lexer) nxtChr(c byte) int {
+func (l *Lexer) nxtChr(c rune) int {
 	return l.nxtChrFrom(c, l.Pos)
 }
