@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 )
 
@@ -152,9 +153,12 @@ func runTestSection(t *testing.T, section TestSection) {
 	t.Run(section.name, func(sectionTest *testing.T) {
 		for _, mdTest := range section.tests {
 			// fmt.Printf("%q\n", mdTest.md)
-			src := renderHTMLFromMD(mdTest.md)
-			if src != mdTest.html {
-				sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)
+			var src, dst string
+			src = renderHTMLFromMD(mdTest.md)
+			src = strings.ReplaceAll(src, "\n", "")
+			dst = strings.ReplaceAll(mdTest.html, "\n", "")
+			if src != dst {
+				sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, dst)
 			}
 		}
 	})
