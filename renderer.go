@@ -31,28 +31,28 @@ func recursiveTraversal(res *string, d []rune, n *Node, ptr *[]Token) {
 	}
 }
 
-var tagNames map[TokenType]string = map[TokenType]string{
-	TokenH1:                 "h1",
-	TokenH2:                 "h2",
-	TokenH3:                 "h3",
-	TokenH4:                 "h4",
-	TokenH5:                 "h5",
-	TokenH6:                 "h6",
-	TokenUnorderedList:      "ul",
-	TokenUnorderedListElem1: "li",
-	TokenUnorderedListElem2: "li",
-	TokenUnorderedListElem3: "li",
-	TokenOrderedList:        "ol",
-	TokenOrderedListElem1:   "li",
-	TokenOrderedListElem2:   "li",
-	TokenCodeBlock:          "pre",
-	TokenBoldStart:          "strong",
-	TokenItalicStart:        "em",
-	TokenTableStart:         "table",
-	TokenTableHeaderStart:   "thead",
-	TokenTableCenterAlign:   "th",
-	TokenTableRow:           "tr",
-	TokenTableCol:           "td",
+var tagNames map[TokenType][]string = map[TokenType][]string{
+	TokenH1:                 []string{"h1"},
+	TokenH2:                 []string{"h2"},
+	TokenH3:                 []string{"h3"},
+	TokenH4:                 []string{"h4"},
+	TokenH5:                 []string{"h5"},
+	TokenH6:                 []string{"h6"},
+	TokenUnorderedList:      []string{"ul"},
+	TokenUnorderedListElem1: []string{"li"},
+	TokenUnorderedListElem2: []string{"li"},
+	TokenUnorderedListElem3: []string{"li"},
+	TokenOrderedList:        []string{"ol"},
+	TokenOrderedListElem1:   []string{"li"},
+	TokenOrderedListElem2:   []string{"li"},
+	TokenCodeBlock:          []string{"pre", "code"},
+	TokenBoldStart:          []string{"strong"},
+	TokenItalicStart:        []string{"em"},
+	TokenTableStart:         []string{"table"},
+	TokenTableHeaderStart:   []string{"thead"},
+	TokenTableCenterAlign:   []string{"th"},
+	TokenTableRow:           []string{"tr"},
+	TokenTableCol:           []string{"td"},
 }
 
 func getOpenedTag(d []rune, t *Token) (int, string) {
@@ -67,25 +67,29 @@ func getOpenedTag(d []rune, t *Token) (int, string) {
 	case TokenSpace:
 		return 1, " "
 	default:
-		var tagString string = tagNames[t.Type]
-		if len(tagString) > 0 {
-			openedTag := "<" + tagString + ">"
-			l := len(tagString) + 2
-			switch t.Type {
-			case TokenCodeBlock:
-				openedTag += string(d[t.Start:t.End])
-				l += t.End - t.Start
-			}
-			return l, openedTag
+		var l int
+		var res string
+		for _, tagString := range tagNames[t.Type] {
+			res += "<" + tagString + ">"
+			l += len(tagString) + 2
 		}
+		switch t.Type {
+		case TokenCodeBlock:
+			res += string(d[t.Start:t.End])
+			l += t.End - t.Start
+		}
+		return l, res
 	}
 	return 0, ""
 }
 
 func getClosedTag(t *Token) (int, string) {
-	var tagString string = tagNames[t.Type]
-	if len(tagString) > 0 {
-		return len(tagString) + 3, "</" + tagString + ">"
+	var l int
+	var res string
+	for i := len(tagNames[t.Type]) - 1; i >= 0; i-- {
+		tagString := tagNames[t.Type][i]
+		l += len(tagString) + 3
+		res += "</" + tagString + ">"
 	}
-	return 0, ""
+	return l, res
 }
