@@ -151,7 +151,7 @@ func runTestSection(t *testing.T, section TestSection) {
 	}
 	t.Run(section.name, func(sectionTest *testing.T) {
 		for _, mdTest := range section.tests {
-			fmt.Printf("%q\n", mdTest.md)
+			// fmt.Printf("%q\n", mdTest.md)
 			src := renderHTMLFromMD(mdTest.md)
 			if src != mdTest.html {
 				sectionTest.Errorf("src != dst\n md: %q\nsrc: %q\ndst: %q\n", mdTest.md, src, mdTest.html)

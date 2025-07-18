@@ -26,7 +26,7 @@ func main() {
 		res *string = new(string)
 	)
 
-	// defer debugInfo(data, res)()
+	defer debugInfo(data, res)()
 
 	tks = Lex(data)
 	ast = Parse(data, tks)

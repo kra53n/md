@@ -25,6 +25,7 @@ const (
 	TokenH6
 	TokenNewL
 	TokenSpace
+	TokenTab
 	TokenAsterisk
 	TokenBacktick
 	TokenDash
@@ -82,7 +83,7 @@ func Lex(d []rune) []Token {
 		if shouldSkipDueNewLRepetitions(tokens, &t) {
 			continue
 		}
-		if hasExcessSapce(tokens, &t) {
+		if hasExcessSpace(tokens, &t) {
 			tokens = tokens[:len(tokens)-1]
 			continue
 		}
@@ -133,6 +134,8 @@ func (l *Lexer) single() Token {
 		return l.newL()
 	case ' ':
 		return l.space()
+	case '\t':
+		return l.tab()
 	case '#':
 		return l.header()
 	case '*':
@@ -414,12 +417,20 @@ func (l *Lexer) newL() Token {
 }
 
 func (l *Lexer) space() Token {
+	return l.repeatedRune(' ', TokenSpace)
+}
+
+func (l *Lexer) tab() Token {
+	return l.repeatedRune('\t', TokenTab)
+}
+
+func (l *Lexer) repeatedRune(r rune, tp TokenType) Token {
 	i := l.Pos
-	for i < len(l.Data) && l.Data[i] == ' ' {
+	for i < len(l.Data) && l.Data[i] == r {
 		i++
 	}
 	t := Token{
-		Type:  TokenSpace,
+		Type:  tp,
 		Start: l.Pos,
 		End:   i,
 	}
@@ -615,7 +626,7 @@ func shouldSkipDueNewLRepetitions(tokens []Token, cur *Token) bool {
 	return prv1 == prv2 && prv1 == cur.Type && cur.Type == TokenNewL
 }
 
-func hasExcessSapce(tokens []Token, cur *Token) bool {
+func hasExcessSpace(tokens []Token, cur *Token) bool {
 	if len(tokens) < 1 {
 		return false
 	}
@@ -629,6 +640,8 @@ func (l *Lexer) analyze(tokens []Token) []Token {
 		// TODO(kra53n): look at the spaces in TokenUnorderedList, TokenOrderedList
 		case TokenSpace:
 			tokens = analyzeSpace(tokens, i)
+		case TokenTab:
+			tokens = analyzeTab(tokens, i)
 		case TokenAsterisk, TokenDash, TokenPlus:
 			tokens = analyzeOnUnorderedList(tokens, i)
 		case TokenUnderscore:
@@ -660,6 +673,25 @@ func shiftTokens(tokens []Token, beg int, end int) []Token {
 func analyzeSpace(tokens []Token, pos int) []Token {
 	cur := tokens[pos]
 	if (cur.End-cur.Start >= 4) && (pos == 0 || tokens[pos-1].Type == TokenNewL) {
+		i := pos
+		for i+1 < len(tokens) && tokens[i+1].Type != TokenNewL {
+			i++
+		}
+		tokens[pos] = Token{
+			Type:  TokenCodeBlock,
+			Start: cur.Start,
+			End:   tokens[i].End,
+		}
+		tokens = shiftTokens(tokens, pos+1, i+1)
+	}
+	return tokens
+}
+
+// TODO(kra53n): analyzeTabs looks like analyzeSpace function. I guess
+// some refactoring is required
+func analyzeTab(tokens []Token, pos int) []Token {
+	if pos == 0 || tokens[pos-1].Type == TokenNewL {
+		cur := tokens[pos]
 		i := pos
 		for i+1 < len(tokens) && tokens[i+1].Type != TokenNewL {
 			i++
