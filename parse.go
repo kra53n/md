@@ -75,11 +75,11 @@ func Parse(d []rune, tokens []Token) *Node {
 			TokenH4,
 			TokenH5,
 			TokenH6,
-			TokenUnorderedListElem1,
-			TokenUnorderedListElem2,
-			TokenUnorderedListElem3,
-			TokenOrderedListElem1,
-			TokenOrderedListElem2:
+			TokenUnorderedListType1,
+			TokenUnorderedListType2,
+			TokenUnorderedListType3,
+			TokenOrderedListType1,
+			TokenOrderedListType2:
 			root.addChd(&Node{T: tokens[i]})
 			cur = root.LstChd
 
@@ -177,20 +177,20 @@ func processTree(root *Node) *Node {
 
 	for cur != nil {
 		switch cur.T.Type {
-		case TokenUnorderedListElem1,
-			TokenUnorderedListElem2,
-			TokenUnorderedListElem3,
-			TokenOrderedListElem1,
-			TokenOrderedListElem2:
+		case TokenUnorderedListType1,
+			TokenUnorderedListType2,
+			TokenUnorderedListType3,
+			TokenOrderedListType1,
+			TokenOrderedListType2:
 
 			var ulNodeTokenType TokenType
 			switch cur.T.Type {
-			case TokenUnorderedListElem1,
-				TokenUnorderedListElem2,
-				TokenUnorderedListElem3:
+			case TokenUnorderedListType1,
+				TokenUnorderedListType2,
+				TokenUnorderedListType3:
 				ulNodeTokenType = TokenUnorderedList
-			case TokenOrderedListElem1,
-				TokenOrderedListElem2:
+			case TokenOrderedListType1,
+				TokenOrderedListType2:
 				ulNodeTokenType = TokenOrderedList
 			}
 			ulNode := &Node{

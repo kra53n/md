@@ -7,11 +7,6 @@ import (
 	"os"
 )
 
-func readFile(filename string) ([]rune, error) {
-	data, err := ioutil.ReadFile(filename)
-	return bytes.Runes(data), err
-}
-
 func main() {
 	filename := "README.md"
 	data, err := readFile(filename)
@@ -33,6 +28,11 @@ func main() {
 	*res = Render(data, ast)
 
 	os.WriteFile("rendered.html", []byte(*res), 0666)
+}
+
+func readFile(filename string) ([]rune, error) {
+	data, err := ioutil.ReadFile(filename)
+	return bytes.Runes(data), err
 }
 
 func debugInfo(data []rune, res *string) func() {

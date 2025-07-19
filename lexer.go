@@ -37,12 +37,12 @@ const (
 	TokenLink
 	TokenImg
 	TokenUnorderedList
-	TokenUnorderedListElem1
-	TokenUnorderedListElem2
-	TokenUnorderedListElem3
+	TokenUnorderedListType1
+	TokenUnorderedListType2
+	TokenUnorderedListType3
 	TokenOrderedList
-	TokenOrderedListElem1
-	TokenOrderedListElem2
+	TokenOrderedListType1
+	TokenOrderedListType2
 	TokenTableStart
 	TokenTableHeaderStart
 	TokenTableHeaderEnd
@@ -578,9 +578,9 @@ func (l *Lexer) digit() Token {
 		case '.', ')':
 			switch c {
 			case '.':
-				t.Type = TokenOrderedListElem1
+				t.Type = TokenOrderedListType1
 			case ')':
-				t.Type = TokenOrderedListElem2
+				t.Type = TokenOrderedListType2
 			}
 			t.Start = l.Pos
 			t.End = i + 1
@@ -715,11 +715,11 @@ func analyzeOnUnorderedList(tokens []Token, pos int) []Token {
 	if pT.Type == TokenNewL || pT.Type == TokenSpace && ppT.Type == TokenNewL || pT.Type == TokenNil {
 		switch t.Type {
 		case TokenAsterisk:
-			t.Type = TokenUnorderedListElem1
+			t.Type = TokenUnorderedListType1
 		case TokenDash:
-			t.Type = TokenUnorderedListElem2
+			t.Type = TokenUnorderedListType2
 		case TokenPlus:
-			t.Type = TokenUnorderedListElem3
+			t.Type = TokenUnorderedListType3
 		}
 	}
 	return tokens
