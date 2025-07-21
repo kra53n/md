@@ -33,42 +33,46 @@ type Node struct {
 	LstChd *Node
 }
 
-/* Operations:
- *    2) addchild
- *    3) getroot
- */
-
-// type Parser struct {
-// 	Cur  *Node
-// 	Prvs []*Node
-// }
+type Parser struct {
+	d      []rune
+	tokens []Token
+	pos    int
+	root   *Node
+	cur    *Node
+}
 
 func Parse(d []rune, tokens []Token) *Node {
-	/* TODO(kra53n):
-	 * Maybe this stage we can call analysis.
+	p := Parser{
+		d:      d,
+		tokens: tokens,
+	}
+	return p.parse()
+}
 
-	 * Define `*` acceptance, it can be:
-	 *   1) unordered list
-	 *   2) italic
-	 *   3) bold
-	 *   4) italic and bold
-	 *
-	 * Group '`' if it can be group.
-	 *
-	 * Tables.
-	 *
-	 * New lines.
-	 *
-	 * Code inserts.
-	 */
+func (p *Parser) parse() *Node {
+	p.root = new(Node)
+	p.cur = p.root
 
-	var root, cur *Node
-	root = new(Node)
-	cur = root
+	defer func() {
+		fmt.Println("nani")
+		println()
+		println("Parse tree before processing:")
+		printRoot(p.root, 2)
+		println()
 
-	// NOTE(kra53n): for more clarity make separate functions with names
-	for i := 0; i < len(tokens); i++ {
-		switch tokens[i].Type {
+		p.root = processTree(p.root)
+
+		println()
+		println("Parse tree after processing:")
+		printRoot(p.root, 2)
+		println()
+	}()
+
+	for {
+		if p.pos >= len(p.tokens) {
+			break
+		}
+		switch p.tokens[p.pos].Type {
 		case TokenH1,
 			TokenH2,
 			TokenH3,
@@ -80,91 +84,70 @@ func Parse(d []rune, tokens []Token) *Node {
 			TokenUnorderedListType3,
 			TokenOrderedListType1,
 			TokenOrderedListType2:
-			root.addChd(&Node{T: tokens[i]})
-			cur = root.LstChd
+			p.becomeNewChd()
 
 		case TokenNewL:
-			for node := cur; node != nil; node = node.Prt {
-				switch node.T.Type {
-				case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
-					cur = root
-				}
-			}
-			if tokens[i+1].Type == TokenNewL {
-				cur = root
-			} else {
-				cur.addChd(&Node{T: Token{Type: TokenSpace}})
-			}
+			p.tokenNewL()
 
 		case TokenPlainText,
 			TokenSpace,
 			TokenUnderscore,
 			TokenBacktick,
 			TokenCodeBlock:
-			cur.addChd(&Node{T: tokens[i]})
+			p.addChd()
 
 		case TokenBoldStart,
 			TokenItalicStart:
-			cur.addChd(&Node{T: tokens[i]})
-			cur = cur.LstChd
+			p.addChd()
+			p.cur = p.cur.LstChd
 		case TokenBoldEnd,
 			TokenItalicEnd:
-			cur = cur.Prt
+			p.cur = p.cur.Prt
 
 		case TokenTableStart, TokenTableHeaderStart, TokenTableBodyStart:
-			cur.addChd(&Node{T: tokens[i]})
-			cur = cur.LstChd
+			p.addChd()
+			p.cur = p.cur.LstChd
 		case TokenTableHeaderEnd:
-			for cur.T.Type != TokenTableHeaderStart {
-				cur = cur.Prt
+			for p.cur.T.Type != TokenTableHeaderStart {
+				p.cur = p.cur.Prt
 			}
-			cur = cur.Prt
+			p.cur = p.cur.Prt
 		case TokenTableBodyEnd:
-			for cur.T.Type != TokenTableBodyStart {
-				cur = cur.Prt
+			for p.cur.T.Type != TokenTableBodyStart {
+				p.cur = p.cur.Prt
 			}
-			cur = cur.Prt
+			p.cur = p.cur.Prt
 		case TokenTableLeftAlign, TokenTableCenterAlign, TokenTableRightAlign:
-			switch cur.T.Type {
+			switch p.cur.T.Type {
 			case TokenTableLeftAlign, TokenTableCenterAlign, TokenTableRightAlign:
-				cur = cur.Prt
+				p.cur = p.cur.Prt
 			}
-			cur.addChd(&Node{T: tokens[i]})
-			cur = cur.LstChd
+			p.addChd()
+			p.cur = p.cur.LstChd
 		case TokenTableRow:
-			switch cur.T.Type {
+			switch p.cur.T.Type {
 			case TokenTableRow:
-				cur = cur.Prt
+				p.cur = p.cur.Prt
 			case TokenTableCol:
-				cur = cur.Prt.Prt
+				p.cur = p.cur.Prt.Prt
 			}
-			cur.addChd(&Node{T: tokens[i]})
-			cur = cur.LstChd
+			p.addChd()
+			p.cur = p.cur.LstChd
 		case TokenTableCol:
-			if cur.T.Type == TokenTableCol {
-				cur = cur.Prt
+			if p.cur.T.Type == TokenTableCol {
+				p.cur = p.cur.Prt
 			}
-			cur.addChd(&Node{T: tokens[i]})
-			cur = cur.LstChd
+			p.addChd()
+			p.cur = p.cur.LstChd
 		case TokenTableEnd:
-			cur = root
+			p.cur = p.root
 
 		}
+
+		p.pos++
 	}
 
-	// println()
-	// println("Parse tree before processing:")
-	// printRoot(root, 2)
-	// println()
-
-	// root = processTree(root)
-
-	// println()
-	// println("Parse tree after processing:")
-	// printRoot(root, 2)
-	// println()
-
-	return root
+	return p.root
 }
 
 func processTree(root *Node) *Node {
@@ -238,15 +221,50 @@ func printRoot(root *Node, spaces int) {
 	}
 }
 
-func (whose *Node) addChd(what *Node) {
-	if whose.FstChd == nil {
-		whose.FstChd = what
-		whose.LstChd = what
-		what.Prt = whose
+func (p *Parser) addChd() {
+	chd := &Node{T: p.tokens[p.pos]}
+	if p.cur.FstChd == nil {
+		p.cur.FstChd = chd
+		p.cur.LstChd = chd
+		chd.Prt = p.cur
 	} else {
-		whose.LstChd.Nxt = what
-		what.Prv = whose.LstChd
-		whose.LstChd = what
-		whose.LstChd.Prt = whose
+		p.cur.LstChd.Nxt = chd
+		chd.Prv = p.cur.LstChd
+		p.cur.LstChd = chd
+		p.cur.LstChd.Prt = p.cur
 	}
+}
+
+func (cur *Node) addNxt(nxt *Node) {
+	nxt.Prt = cur.Nxt
+	if cur.Nxt == nil {
+		cur.Nxt = nxt
+		nxt.Prt.LstChd = nxt
+	} else {
+		cur.Nxt.Prv = nxt
+		nxt.Prv = cur
+		nxt.Nxt = cur.Nxt
+		cur.Nxt = nxt
+	}
+}
+
+func (p *Parser) tokenNewL() {
+	p.cur = p.root
+	// for node := p.cur; node != nil; node = node.Prt {
+	// 	switch node.T.Type {
+	// 	case TokenH1, TokenH2, TokenH3, TokenH4, TokenH5, TokenH6:
+	// 		p.cur = p.root
+	// 	}
+	// }
+	// if p.tokens[p.pos+1].Type == TokenNewL {
+	// 	p.cur = p.root
+	// } else {
+	// 	// TODO(kra53n):
+	// 	// p.cur.addChd(&Node{T: Token{Type: TokenSpace}})
+	// }
+}
+
+func (p *Parser) becomeNewChd() {
+	p.addChd()
+	p.cur = p.cur.LstChd
 }

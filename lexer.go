@@ -137,6 +137,10 @@ func (l *Lexer) single() Token {
 	case '\t':
 		return l.tab()
 	case '#':
+		/* TODO(kra53n):
+		   it is possible user input `# # # title`. We must understand that
+		   the first `#` is a header1 and other just a plain text
+		*/
 		return l.header()
 	case '*':
 		return l.charToken(TokenAsterisk)
