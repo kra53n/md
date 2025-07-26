@@ -10,12 +10,12 @@ const (
 )
 
 type Lexer struct {
-	Data []rune
-	cur  int
-	col int
-	bol int // current line
+	Data   []rune
+	cur    int
+	col    int
+	bol    int // current line
 	tokens []Token
-	state LexerState
+	state  LexerState
 
 	Pos int // TODO(kra53n): delete
 }
@@ -40,8 +40,8 @@ func (l *Lexer) chopRune() {
 }
 
 func (l *Lexer) chopToken(t Token) {
-	l.cur = t.End+1
-	l.col += t.End+1 - t.Start
+	l.cur = t.End + 1
+	l.col += t.End + 1 - t.Start
 }
 
 func Lex(d []rune) []Token {
@@ -114,7 +114,8 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	}
 	tokens = append(tokens, Token{Type: TokenTableEnd})
 
-	return tokens, true}
+	return tokens, true
+}
 
 func (l *Lexer) single() Token {
 	switch l.peekRune() {
@@ -408,7 +409,7 @@ Loop:
 	l.state = Default
 	l.bol++
 	l.col = 0
-	return 
+	return
 }
 
 func (l *Lexer) space() Token {
@@ -432,8 +433,8 @@ func (l *Lexer) repeatedRune(r rune, tp TokenType) Token {
 	}
 	return Token{
 		Start: l.cur,
-		End: it.cur,
-		Type: tp,
+		End:   it.cur,
+		Type:  tp,
 	}
 }
 
@@ -457,42 +458,46 @@ func (l *Lexer) header() Token {
 	}
 	return Token{
 		Start: l.cur,
-		End: it.cur,
-		Type: TokenType(int(TokenH1) + hashes - 1),
+		End:   it.cur,
+		Type:  TokenType(int(TokenH1) + hashes - 1),
 	}
-// 	t := Token{}
-// 	i := l.Pos
-// 	for ; i < len(l.Data); i++ {
-// 		switch {
-// 		case l.Data[i] == '#' && i-l.Pos == 6:
-// 			return t
-// 		case l.Data[i] == '#':
-// 			continue
-// 		case l.Data[i] == '\r':
-// 			return t
-// 		case l.Data[i] == ' ':
-// 			goto CheckContent
-// 		default:
-// 			return l.plainText()
-// 		}
-// 	}
-// CheckContent:
-// 	for j := i; j < len(l.Data); j++ {
-// 		switch {
-// 		case l.skipChar(j):
-// 			continue
-// 		case l.Data[j] == '\r':
-// 			return t
-// 		default:
-// 			goto Ok
-// 		}
-// 	}
-// Ok:
-// 	t.Start = l.Pos
-// 	t.End = i
-// 	t.Type = TokenType(int(TokenH1) + i - l.Pos - 1)
-// 	l.Pos = i
-// 	return t
+	//	t := Token{}
+	//	i := l.Pos
+	//	for ; i < len(l.Data); i++ {
+	//		switch {
+	//		case l.Data[i] == '#' && i-l.Pos == 6:
+	//			return t
+	//		case l.Data[i] == '#':
+	//			continue
+	//		case l.Data[i] == '\r':
+	//			return t
+	//		case l.Data[i] == ' ':
+	//			goto CheckContent
+	//		default:
+	//			return l.plainText()
+	//		}
+	//	}
+	//
+	// CheckContent:
+	//
+	//	for j := i; j < len(l.Data); j++ {
+	//		switch {
+	//		case l.skipChar(j):
+	//			continue
+	//		case l.Data[j] == '\r':
+	//			return t
+	//		default:
+	//			goto Ok
+	//		}
+	//	}
+	//
+	// Ok:
+	//
+	//	t.Start = l.Pos
+	//	t.End = i
+	//	t.Type = TokenType(int(TokenH1) + i - l.Pos - 1)
+	//	l.Pos = i
+	//	return t
 }
 
 func (l *Lexer) charToken(tp TokenType) Token {
@@ -626,15 +631,15 @@ func (l *Lexer) plainText() Token {
 	}
 	t := Token{
 		Start: l.cur,
-		End: it.cur,
-		Type: TokenPlainText,
+		End:   it.cur,
+		Type:  TokenPlainText,
 	}
 	return t.trimSpace(l.Data)
 }
 
 func (t Token) trimSpace(d []rune) Token {
 	for t.Start < t.End {
-		switch d[t.Start]  {
+		switch d[t.Start] {
 		case ' ', '\t':
 			t.Start++
 		default:
@@ -643,7 +648,7 @@ func (t Token) trimSpace(d []rune) Token {
 	}
 	return t
 }
-	
+
 func (l *Lexer) shouldEscapeFromPlainText() bool {
 	switch l.peekRune() {
 	case '\r', '\n', '*', '`', '_', '~', 0:
