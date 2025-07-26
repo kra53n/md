@@ -49,24 +49,25 @@ func Parse(d []rune, tokens []Token) *Node {
 	return p.parse()
 }
 
+func printRoot(root *Node) {
+	println()
+	println("Parse tree before processing:")
+	println(rootStringRepr(root))
+	println()
+
+	// p.root = processTree(root)
+
+	// println()
+	// println("Parse tree after processing:")
+	// println(rootStringRepr(root))
+	// println()
+}
+
 func (p *Parser) parse() *Node {
 	p.root = new(Node)
 	p.cur = p.root
 
-	defer func() {
-		fmt.Println("nani")
-		println()
-		println("Parse tree before processing:")
-		println(rootStringRepr(p.root))
-		println()
-
-		p.root = processTree(p.root)
-
-		println()
-		println("Parse tree after processing:")
-		println(rootStringRepr(p.root))
-		println()
-	}()
+	// defer printRoot(p.root)
 
 	for {
 		if p.pos >= len(p.tokens) {
@@ -84,7 +85,7 @@ func (p *Parser) parse() *Node {
 			TokenUnorderedListType3,
 			TokenOrderedListType1,
 			TokenOrderedListType2:
-			p.becomeNewChd()
+			p.addAndBecomeNewChd() // addAndBecomeLstChd
 
 		case TokenNewL:
 			p.tokenNewL()
@@ -98,8 +99,9 @@ func (p *Parser) parse() *Node {
 
 		case TokenBoldStart,
 			TokenItalicStart:
-			p.addChd()
-			p.cur = p.cur.LstChd
+			p.addAndBecomeNewChd()
+			// p.addChd() // addAndbecomeLstChd
+			// p.cur = p.cur.LstChd
 		case TokenBoldEnd,
 			TokenItalicEnd:
 			p.cur = p.cur.Prt
@@ -270,6 +272,11 @@ func (p *Parser) tokenNewL() {
 }
 
 func (p *Parser) becomeNewChd() {
+	p.addChd()
+	p.cur = p.cur.LstChd
+}
+
+func (p *Parser) addAndBecomeNewChd() {
 	p.addChd()
 	p.cur = p.cur.LstChd
 }
