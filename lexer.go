@@ -145,10 +145,10 @@ func (l *Lexer) single() Token {
 		return l.charToken(TokenDash)
 	case '+':
 		return l.charToken(TokenPlus)
-	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return l.digit()
 	default:
-		return Token{}
+		return l.plainText()
 	}
 }
 
@@ -414,14 +414,14 @@ Loop:
 
 func (l *Lexer) space() Token {
 	if l.col > 0 {
-		return Token{}
+		return Token{Start: l.cur, End: l.cur+1}
 	}
 	return l.repeatedRune(' ', TokenSpace)
 }
 
 func (l *Lexer) tab() Token {
 	if l.col > 0 {
-		return Token{}
+		return Token{Start: l.cur, End: l.cur+1}
 	}
 	return l.repeatedRune('\t', TokenTab)
 }
@@ -581,47 +581,27 @@ func (l *Lexer) openBrac() Token {
 	return l.charToken(TokenPlainText)
 }
 
-func (l *Lexer) digit() Token {
-	t := Token{
-		Start: l.Pos,
-		End:   l.Pos + 1,
-	}
-	i := l.Pos
-	for i > 0 && l.Data[i] == ' ' {
-		i--
-	}
-	if !(i == l.Pos && i == 0 || l.Data[i] != '\r') {
-		t.Type = TokenPlainText
-		return t
-	}
-	i = l.Pos
-	for ; i < len(l.Data); i++ {
-		c := l.Data[i]
-		if '0' <= c && c <= '9' {
+func (l *Lexer) digit() (t Token) {
+	it := *l
+	t.Start = l.cur
+	for ; it.canMove(); it.chopRune() {
+		switch it.peekRune() {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			continue
+		case '.':
+			t.Type = TokenOrderedListType1
+			t.End = it.cur+1
+			return 
+		case ')':
+			t.Type = TokenOrderedListType2
+			t.End = it.cur+1
+			return
 		}
-		switch c {
-		case '.', ')':
-			switch c {
-			case '.':
-				t.Type = TokenOrderedListType1
-			case ')':
-				t.Type = TokenOrderedListType2
-			}
-			t.Start = l.Pos
-			t.End = i + 1
-			l.Pos = i
-			return t
-		default:
-			t.Type = TokenPlainText
-			t.Start = l.Pos
-			t.End = i
-			l.Pos = i - 1
-			return t
-		}
+		break
 	}
 	t.Type = TokenPlainText
-	return t
+	t.End = it.cur
+	return
 }
 
 func (l *Lexer) plainText() Token {
