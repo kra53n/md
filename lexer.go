@@ -40,26 +40,22 @@ func (l *Lexer) chopRune() {
 }
 
 func (l *Lexer) chopToken(t Token) {
-	l.cur = t.End
-	l.col += t.End - t.Start
+	l.cur = t.End+1
+	l.col += t.End+1 - t.Start
 }
 
 func Lex(d []rune) []Token {
 	l := Lexer{Data: d}
 
-	// var t Token
-	// var isTable bool
-
 	for l.canMove() {
-		// l.peekRune()
 		if t := l.single(); t.Type != TokenNil {
 			l.tokens = append(l.tokens, t)
 			l.chopToken(t)
-			// continue
-			if t.Type == TokenNewL { break }
+			continue
 		}
+		l.chopRune()
 	}
-	// l.printTokens()
+	l.printTokens()
 
 	return l.tokens
 
@@ -121,7 +117,7 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	return tokens, true}
 
 func (l *Lexer) single() Token {
-	switch l.Data[l.Pos] {
+	switch l.peekRune() {
 	case '\r', '\n':
 		return l.newL()
 	case ' ':
@@ -401,17 +397,18 @@ func (l *Lexer) tableAppendData(tokens []Token, pipes int, pos int) []Token {
 }
 
 func (l *Lexer) newL() (t Token) {
+	t.Start = l.cur
+Loop:
 	for it := *l; it.canMove(); it.chopRune() {
 		switch it.peekRune() {
 		case '\r':
 		case '\n':
-			t.Start = l.cur
-			t.End = it.cur+1
-			t.Type = TokenNewL
+			t.End = it.cur
 		default:
-			break
+			break Loop
 		}
 	}
+	t.Type = TokenNewL
 	l.state = Default
 	l.bol++
 	l.col = 0
@@ -419,25 +416,29 @@ func (l *Lexer) newL() (t Token) {
 }
 
 func (l *Lexer) space() Token {
+	if l.col > 0 {
+		return Token{}
+	}
 	return l.repeatedRune(' ', TokenSpace)
 }
 
 func (l *Lexer) tab() Token {
+	if l.col > 0 {
+		return Token{}
+	}
 	return l.repeatedRune('\t', TokenTab)
 }
 
 func (l *Lexer) repeatedRune(r rune, tp TokenType) Token {
-	i := l.Pos
-	for i < len(l.Data) && l.Data[i] == r {
-		i++
+	it := *l
+	for it.canMove() && it.peekRune() == r {
+		it.chopRune()
 	}
-	t := Token{
-		Type:  tp,
-		Start: l.Pos,
-		End:   i,
+	return Token{
+		Start: l.cur,
+		End: it.cur,
+		Type: tp,
 	}
-	l.Pos = i - 1
-	return t
 }
 
 func (l *Lexer) header() Token {
@@ -629,7 +630,7 @@ func (l *Lexer) plainText() Token {
 	}
 	t := Token{
 		Start: l.cur,
-		End: it.cur+1,
+		End: it.cur,
 		Type: TokenPlainText,
 	}
 	return t.trimSpace(l.Data)
@@ -649,7 +650,7 @@ func (t Token) trimSpace(d []rune) Token {
 	
 func (l *Lexer) shouldEscapeFromPlainText() bool {
 	switch l.peekRune() {
-	case '\r', '\n', '*', '`', '_', '~':
+	case '\r', '\n', '*', '`', '_', '~', 0:
 		return true
 	}
 	return false
