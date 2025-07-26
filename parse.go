@@ -57,14 +57,14 @@ func (p *Parser) parse() *Node {
 		fmt.Println("nani")
 		println()
 		println("Parse tree before processing:")
-		printRoot(p.root, 2)
+		println(rootStringRepr(p.root))
 		println()
 
 		p.root = processTree(p.root)
 
 		println()
 		println("Parse tree after processing:")
-		printRoot(p.root, 2)
+		println(rootStringRepr(p.root))
 		println()
 	}()
 
@@ -207,18 +207,23 @@ func processTree(root *Node) *Node {
 	return root
 }
 
-func printRoot(root *Node, spaces int) {
+func rootStringRepr(root *Node) string {
+	return rootStringReprWithSpacesParam(root, 2)
+}
+
+func rootStringReprWithSpacesParam(root *Node, spaces int) string {
+	var res, s string
 	if root == nil {
-		return
+		return res
 	}
-	var s string
-	for i := 0; i < spaces; i++ {
+	for range spaces {
 		s += " "
 	}
 	for i := root.FstChd; i != nil; i = i.Nxt {
-		fmt.Printf("%s%d\n", s, i.T.Type)
-		printRoot(i, spaces+2)
+		res += fmt.Sprintf("%s%d\n", s, i.T.Type)
+		res += rootStringReprWithSpacesParam(i, spaces+2)
 	}
+	return res
 }
 
 func (p *Parser) addChd() {
