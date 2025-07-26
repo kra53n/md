@@ -2,94 +2,87 @@ package main
 
 import "fmt"
 
-type Lexer struct {
-	Data []rune
-	Pos  int
-}
-
-type Token struct {
-	Type  TokenType
-	Start int
-	End   int
-}
-
-type TokenType int
+type LexerState uint
 
 const (
-	TokenNil TokenType = iota
-	TokenH1
-	TokenH2
-	TokenH3
-	TokenH4
-	TokenH5
-	TokenH6
-	TokenNewL
-	TokenSpace
-	TokenTab
-	TokenAsterisk
-	TokenBacktick
-	TokenDash
-	TokenPlus
-	TokenQuote
-	TokenUnderscore
-	TokenTilde
-	TokenPlainText
-	TokenLink
-	TokenImg
-	TokenUnorderedList
-	TokenUnorderedListType1
-	TokenUnorderedListType2
-	TokenUnorderedListType3
-	TokenOrderedList
-	TokenOrderedListType1
-	TokenOrderedListType2
-	TokenTableStart
-	TokenTableHeaderStart
-	TokenTableHeaderEnd
-	TokenTableBodyStart
-	TokenTableBodyEnd
-	TokenTableLeftAlign
-	TokenTableCenterAlign
-	TokenTableRightAlign
-	TokenTableRow
-	TokenTableCol
-	TokenTableEnd
-	TokenCodeLine
-	TokenCodeBlock
-	TokenBoldStart
-	TokenBoldEnd
-	TokenItalicStart
-	TokenItalicEnd
-	TokenStrikeThrough
+	Default LexerState = iota
+	ReadHeader
 )
 
-func Lex(d []rune) []Token {
-	l := Lexer{}
-	l.Data = d
+type Lexer struct {
+	Data []rune
+	cur  int
+	col int
+	bol int // current line
+	tokens []Token
+	state LexerState
 
-	var tokens []Token
-	var t Token
-	var isTable bool
-	for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
-		tokens, isTable = l.table(tokens)
-		if isTable && l.tableStartsWithPipe() {
-			continue
-		}
-		t = l.single()
-		if t.Type == TokenNil {
-			t = l.plainText()
-		}
+	Pos int // TODO(kra53n): delete
+}
 
-		if shouldSkipDueNewLRepetitions(tokens, &t) {
-			continue
-		}
-		if hasExcessSpace(tokens, &t) {
-			tokens = tokens[:len(tokens)-1]
-			continue
-		}
-		tokens = append(tokens, t)
+func (l *Lexer) printTokens() {
+	for _, t := range l.tokens {
+		t.Print(l.Data)
 	}
-	return l.analyze(tokens)
+}
+
+func (l *Lexer) canMove() bool {
+	return l.cur < len(l.Data)
+}
+
+func (l *Lexer) peekRune() rune {
+	return l.Data[l.cur]
+}
+
+func (l *Lexer) chopRune() {
+	l.cur++
+	l.col++
+}
+
+func (l *Lexer) chopToken(t Token) {
+	l.cur = t.End
+	l.col += t.End - t.Start
+}
+
+func Lex(d []rune) []Token {
+	l := Lexer{Data: d}
+
+	// var t Token
+	// var isTable bool
+
+	for l.canMove() {
+		// l.peekRune()
+		if t := l.single(); t.Type != TokenNil {
+			l.tokens = append(l.tokens, t)
+			l.chopToken(t)
+			// continue
+			if t.Type == TokenNewL { break }
+		}
+	}
+	// l.printTokens()
+
+	return l.tokens
+
+	// for l.Pos = 0; l.Pos < len(l.Data); l.Pos++ {
+	// 	tokens, isTable = l.table(tokens)
+	// 	if isTable && l.tableStartsWithPipe() {
+	// 		continue
+	// 	}
+	// 	t = l.single()
+	// 	if t.Type == TokenNil {
+	// 		t = l.plainText()
+	// 	}
+
+	// 	if shouldSkipDueNewLRepetitions(tokens, &t) {
+	// 		continue
+	// 	}
+	// 	if hasExcessSpace(tokens, &t) {
+	// 		tokens = tokens[:len(tokens)-1]
+	// 		continue
+	// 	}
+	// 	tokens = append(tokens, t)
+	// }
+	// return l.analyze(tokens)
 }
 
 func (l *Lexer) table(tokens []Token) ([]Token, bool) {
@@ -125,12 +118,11 @@ func (l *Lexer) table(tokens []Token) ([]Token, bool) {
 	}
 	tokens = append(tokens, Token{Type: TokenTableEnd})
 
-	return tokens, true
-}
+	return tokens, true}
 
 func (l *Lexer) single() Token {
 	switch l.Data[l.Pos] {
-	case '\r':
+	case '\r', '\n':
 		return l.newL()
 	case ' ':
 		return l.space()
@@ -408,16 +400,22 @@ func (l *Lexer) tableAppendData(tokens []Token, pipes int, pos int) []Token {
 	return tokens
 }
 
-func (l *Lexer) newL() Token {
-	t := Token{}
-	if l.Pos < len(l.Data)-1 && l.Data[l.Pos+1] == '\n' {
-		t.Type = TokenNewL
-		t.Start = l.Pos
-		t.End = l.Pos + 2
-		l.Pos++
-		return t
+func (l *Lexer) newL() (t Token) {
+	for it := *l; it.canMove(); it.chopRune() {
+		switch it.peekRune() {
+		case '\r':
+		case '\n':
+			t.Start = l.cur
+			t.End = it.cur+1
+			t.Type = TokenNewL
+		default:
+			break
+		}
 	}
-	return t
+	l.state = Default
+	l.bol++
+	l.col = 0
+	return 
 }
 
 func (l *Lexer) space() Token {
@@ -443,39 +441,61 @@ func (l *Lexer) repeatedRune(r rune, tp TokenType) Token {
 }
 
 func (l *Lexer) header() Token {
-	t := Token{}
-	i := l.Pos
-	for ; i < len(l.Data); i++ {
-		switch {
-		case l.Data[i] == '#' && i-l.Pos == 6:
-			return t
-		case l.Data[i] == '#':
-			continue
-		case l.Data[i] == '\r':
-			return t
-		case l.Data[i] == ' ':
-			goto CheckContent
-		default:
-			return l.plainText()
-		}
+	if l.state == ReadHeader {
+		return l.plainText()
 	}
-CheckContent:
-	for j := i; j < len(l.Data); j++ {
-		switch {
-		case l.skipChar(j):
+	l.state = ReadHeader
+
+	var hashes int
+	it := *l
+	for ; it.canMove(); it.chopRune() {
+		if it.peekRune() == '#' {
+			hashes++
+			if hashes > 6 {
+				return l.plainText()
+			}
 			continue
-		case l.Data[j] == '\r':
-			return t
-		default:
-			goto Ok
 		}
+		break
 	}
-Ok:
-	t.Start = l.Pos
-	t.End = i
-	t.Type = TokenType(int(TokenH1) + i - l.Pos - 1)
-	l.Pos = i
-	return t
+	return Token{
+		Start: l.cur,
+		End: it.cur,
+		Type: TokenType(int(TokenH1) + hashes - 1),
+	}
+// 	t := Token{}
+// 	i := l.Pos
+// 	for ; i < len(l.Data); i++ {
+// 		switch {
+// 		case l.Data[i] == '#' && i-l.Pos == 6:
+// 			return t
+// 		case l.Data[i] == '#':
+// 			continue
+// 		case l.Data[i] == '\r':
+// 			return t
+// 		case l.Data[i] == ' ':
+// 			goto CheckContent
+// 		default:
+// 			return l.plainText()
+// 		}
+// 	}
+// CheckContent:
+// 	for j := i; j < len(l.Data); j++ {
+// 		switch {
+// 		case l.skipChar(j):
+// 			continue
+// 		case l.Data[j] == '\r':
+// 			return t
+// 		default:
+// 			goto Ok
+// 		}
+// 	}
+// Ok:
+// 	t.Start = l.Pos
+// 	t.End = i
+// 	t.Type = TokenType(int(TokenH1) + i - l.Pos - 1)
+// 	l.Pos = i
+// 	return t
 }
 
 func (l *Lexer) charToken(tp TokenType) Token {
@@ -603,21 +623,36 @@ func (l *Lexer) digit() Token {
 }
 
 func (l *Lexer) plainText() Token {
-	i := l.Pos
-	for ; i < len(l.Data); i++ {
-		switch l.Data[i] {
-		case '\r', ' ', '*', '`', '_', '~':
-			goto End
+	it := *l
+	for it.canMove() && !it.shouldEscapeFromPlainText() {
+		it.chopRune()
+	}
+	t := Token{
+		Start: l.cur,
+		End: it.cur+1,
+		Type: TokenPlainText,
+	}
+	return t.trimSpace(l.Data)
+}
+
+func (t Token) trimSpace(d []rune) Token {
+	for t.Start < t.End {
+		switch d[t.Start]  {
+		case ' ', '\t':
+			t.Start++
+		default:
+			return t
 		}
 	}
-End:
-	t := Token{
-		Type:  TokenPlainText,
-		Start: l.Pos,
-		End:   i,
-	}
-	l.Pos = i - 1
 	return t
+}
+	
+func (l *Lexer) shouldEscapeFromPlainText() bool {
+	switch l.peekRune() {
+	case '\r', '\n', '*', '`', '_', '~':
+		return true
+	}
+	return false
 }
 
 func shouldSkipDueNewLRepetitions(tokens []Token, cur *Token) bool {

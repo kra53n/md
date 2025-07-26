@@ -60,12 +60,12 @@ type lexerTestSuite struct {
 }
 
 var lexerTestHeaders []lexerTestSuite = []lexerTestSuite{
-	{"# header 1", []Token{Token{Type: TokenH1}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
-	{"## header 2", []Token{Token{Type: TokenH2}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
-	{"### header 3", []Token{Token{Type: TokenH3}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
-	{"#### header 4", []Token{Token{Type: TokenH4}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
-	{"##### header 5", []Token{Token{Type: TokenH5}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
-	{"###### header 6", []Token{Token{Type: TokenH6}, Token{Type: TokenPlainText}, Token{Type: TokenSpace}, Token{Type: TokenPlainText}}},
+	{"# header 1", []Token{Token{Type: TokenH1}, Token{Type: TokenPlainText}}},
+	{"## header 2", []Token{Token{Type: TokenH2}, Token{Type: TokenPlainText}}},
+	{"### header 3", []Token{Token{Type: TokenH3}, Token{Type: TokenPlainText}}},
+	{"#### header 4", []Token{Token{Type: TokenH4}, Token{Type: TokenPlainText}}},
+	{"##### header 5", []Token{Token{Type: TokenH5}, Token{Type: TokenPlainText}}},
+	{"###### header 6", []Token{Token{Type: TokenH6}, Token{Type: TokenPlainText}}},
 }
 
 func (t Token) String() string {

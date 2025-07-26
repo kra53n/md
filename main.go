@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os"
+	// "os"
 )
 
 func main() {
@@ -17,17 +17,19 @@ func main() {
 
 	var (
 		tks []Token
-		ast *Node
-		res *string = new(string)
+		// ast *Node
+		// res *string = new(string)
 	)
 
-	defer debugInfo(data, res)()
+	// defer debugInfo(data, res)()
 
 	tks = Lex(data)
-	ast = Parse(data, tks)
-	*res = Render(data, ast)
+	_ = tks
+	// fmt.Println(tks)
+	// ast = Parse(data, tks)
+	// *res = Render(data, ast)
 
-	os.WriteFile("rendered.html", []byte(*res), 0666)
+	// os.WriteFile("rendered.html", []byte(*res), 0666)
 }
 
 func readFile(filename string) ([]rune, error) {
