@@ -9,6 +9,8 @@ const (
 	ReadHeader
 )
 
+const tabIdent = 4
+
 type Lexer struct {
 	Data   []rune
 	cur    int
@@ -40,8 +42,8 @@ func (l *Lexer) chopRune() {
 }
 
 func (l *Lexer) chopToken(t Token) {
-	l.cur = t.End + 1
-	l.col += t.End + 1 - t.Start
+	l.cur = t.End
+	l.col += t.End - t.Start
 }
 
 func Lex(d []rune) []Token {
@@ -51,11 +53,14 @@ func Lex(d []rune) []Token {
 		if t := l.single(); t.Type != TokenNil {
 			l.tokens = append(l.tokens, t)
 			l.chopToken(t)
-			continue
+			switch t.Type {
+			case TokenTab:
+				continue
+			}
 		}
 		l.chopRune()
 	}
-	l.printTokens()
+	// l.printTokens()
 
 	return l.tokens
 
@@ -127,24 +132,24 @@ func (l *Lexer) single() Token {
 		return l.tab()
 	case '#':
 		return l.header()
-	case '*':
-		return l.charToken(TokenAsterisk)
-	case '`':
-		return l.charToken(TokenBacktick)
-	case '>':
-		return l.charToken(TokenQuote)
-	case '_':
-		return l.charToken(TokenUnderscore)
-	case '~':
-		return l.charToken(TokenTilde)
-	case '!':
-		return l.exclamationMark()
-	case '[':
-		return l.openBrac()
-	case '-':
-		return l.charToken(TokenDash)
-	case '+':
-		return l.charToken(TokenPlus)
+	// case '*':
+	// 	return l.charToken(TokenAsterisk)
+	// case '`':
+	// 	return l.charToken(TokenBacktick)
+	// case '>':
+	// 	return l.charToken(TokenQuote)
+	// case '_':
+	// 	return l.charToken(TokenUnderscore)
+	// case '~':
+	// 	return l.charToken(TokenTilde)
+	// case '!':
+	// 	return l.exclamationMark()
+	// case '[':
+	// 	return l.openBrac()
+	// case '-':
+	// 	return l.charToken(TokenDash)
+	// case '+':
+	// 	return l.charToken(TokenPlus)
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return l.digit()
 	default:
@@ -414,17 +419,101 @@ Loop:
 
 func (l *Lexer) space() Token {
 	if l.col > 0 {
-		return Token{Start: l.cur, End: l.cur+1}
+		return Token{Start: l.cur, End: l.cur + 1, Type: TokenSpace}
+	}
+	it := *l
+	var n int
+	for ; it.canMove(); it.chopRune() {
+		switch it.peekRune() {
+		case ' ':
+			n++
+		case '\t':
+			n += 4
+		}
+		if n >= 4 {
+			return l.codeBlock()
+		}
 	}
 	return l.repeatedRune(' ', TokenSpace)
 }
 
 func (l *Lexer) tab() Token {
 	if l.col > 0 {
-		return Token{Start: l.cur, End: l.cur+1}
+		return Token{Start: l.cur, End: l.cur + 1, Type: TokenTab}
 	}
-	return l.repeatedRune('\t', TokenTab)
+	return l.codeBlock()
 }
+
+func (l *Lexer) codeBlock() Token {
+	it := *l
+	var end int
+
+MainLoop:
+	for {
+		var n int
+		for ; it.canMove(); it.chopRune() {
+			r := it.peekRune()
+			if r != ' ' && r != '\t' {
+				break MainLoop
+			}
+			if r == ' ' {
+				n++
+			}
+			if r == '\t' {
+				n += tabIdent
+			}
+			if n >= 4 {
+				break
+			}
+		}
+		it.moveToNewL()
+		end = it.cur
+	}
+
+	if end > 0 {
+		return Token{
+			Start: l.cur,
+			End:   end,
+			Type:  TokenCodeBlock,
+		}
+	}
+	return Token{}
+
+	// for ; it.canMove(); it.chopRune() {
+	// 	r := it.peekRune()
+	// 	if r == ' ' || r == '\t' {
+	// 		continue
+	// 	}
+	// 	break
+	// }
+	// start := it.cur
+	// it.moveToNewL()
+	// t := it.single()
+	// it.chopToken(t)
+	// t.Print(l.Data)
+	// return Token{
+	// 	Start: start,
+	// 	End: it.cur,
+	// 	Type: TokenCodeBlock,
+	// }
+}
+
+func (l *Lexer) moveToNewL() {
+	for l.canMove() {
+		switch l.peekRune() {
+		case '\r', '\n':
+			return
+		}
+		l.chopRune()
+	}
+}
+
+// func (l *Lexer) back() {
+// 	l.cur--
+// 	l.col--
+// 	// NOTE(kra53n): there could be a situation when we go to prev line
+// 	// it means that we should change values col and bol in a right way.
+// }
 
 func (l *Lexer) repeatedRune(r rune, tp TokenType) Token {
 	it := *l
@@ -590,11 +679,11 @@ func (l *Lexer) digit() (t Token) {
 			continue
 		case '.':
 			t.Type = TokenOrderedListType1
-			t.End = it.cur+1
-			return 
+			t.End = it.cur + 1
+			return
 		case ')':
 			t.Type = TokenOrderedListType2
-			t.End = it.cur+1
+			t.End = it.cur + 1
 			return
 		}
 		break
